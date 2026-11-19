@@ -1,0 +1,913 @@
+<!doctype html>
+<!-- Waypoint dashboard template. build.py injects the data into the D constant below. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Waypoint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Public+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* Layout: sticky tab bar; Overview opens on the "road" (net-worth projection + three goal stations); other tabs are dense operational panels. */
+:root{
+  color-scheme: light;
+  --bg:#eef1f6; --surface:#ffffff; --surface-2:#f6f8fc; --ink:#121831; --ink-2:#434a64; --muted:#5f6680; --line:#dfe3ed;
+  --accent:#3346d3; --accent-soft:#e5e8fb; --sun:#c98500; --sun-soft:#fbf0d8;
+  --good:#17803f; --good-soft:#e3f3e8; --warn:#a8670a; --warn-soft:#fbefd9; --bad:#c23a32; --bad-soft:#fbe6e4;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948; --other:#b4b2a9;
+  --heat0:#eef1f8; --heat1:#cde2fb; --heat2:#86b6ef; --heat3:#3987e5; --heat4:#1c5cab;
+  --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body:"Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  color-scheme: dark;
+  --bg:#0b0f1e; --surface:#131a2f; --surface-2:#18203a; --ink:#edf0f8; --ink-2:#b9bfd6; --muted:#959cb8; --line:#242c47;
+  --accent:#8193ff; --accent-soft:#1d2652; --sun:#f2b544; --sun-soft:#3a2d12;
+  --good:#45c27a; --good-soft:#123222; --warn:#e9ad46; --warn-soft:#3a2b10; --bad:#f07068; --bad-soft:#3d1a1a;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; --other:#5f5e59;
+  --heat0:#18203a; --heat1:#184f95; --heat2:#256abf; --heat3:#3987e5; --heat4:#86b6ef;
+}}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0b0f1e; --surface:#131a2f; --surface-2:#18203a; --ink:#edf0f8; --ink-2:#b9bfd6; --muted:#959cb8; --line:#242c47;
+  --accent:#8193ff; --accent-soft:#1d2652; --sun:#f2b544; --sun-soft:#3a2d12;
+  --good:#45c27a; --good-soft:#123222; --warn:#e9ad46; --warn-soft:#3a2b10; --bad:#f07068; --bad-soft:#3d1a1a;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; --other:#5f5e59;
+  --heat0:#18203a; --heat1:#184f95; --heat2:#256abf; --heat3:#3987e5; --heat4:#86b6ef;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1200px;margin:0 auto;padding-block:0 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:22px;font-weight:700}
+h3{font-size:15px;font-weight:700;font-family:var(--body);letter-spacing:0}
+.num{font-variant-numeric:tabular-nums}
+.eyebrow{font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)} .good{color:var(--good)} .bad{color:var(--bad)}
+
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);margin-bottom:28px}
+nav .inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:20px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.brand{font-family:var(--display);font-weight:800;font-size:17px;white-space:nowrap}
+.brand span{color:var(--accent)}
+.tablist{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
+.tablist a{color:var(--ink-2);text-decoration:none;font-weight:600;font-size:14px;padding:7px 12px;border-radius:9px;white-space:nowrap}
+.tablist a:hover{background:var(--surface)}
+.tablist a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+.tablist .count{display:inline-block;min-width:18px;padding:0 5px;margin-left:5px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;line-height:18px;text-align:center}
+.iconbtn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:9px;padding:6px 10px;font:600 13px var(--body);cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;min-width:0}
+.stack{display:grid;gap:20px}
+.grid{display:grid;gap:20px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+.head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.sub{font-size:13px;color:var(--muted)}
+[data-view]{display:none} [data-view].on{display:block}
+
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.55fr);gap:28px;align-items:end;margin-bottom:22px}
+@media (max-width:860px){.hero{grid-template-columns:1fr}}
+.hero h1{font-size:clamp(30px,4.6vw,50px);line-height:1.02;font-weight:800}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero .lede{color:var(--ink-2);margin:12px 0 18px;max-width:46ch}
+.figs{display:flex;gap:28px;flex-wrap:wrap}
+.fig .v{font-family:var(--display);font-size:28px;font-weight:700;line-height:1.1}
+.fig .l{font-size:12.5px;color:var(--muted)}
+.chart{position:relative;height:300px}
+.chart.sm{height:230px}
+
+.road{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:760px){.road{grid-template-columns:1fr}}
+.station{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.station .when{font-family:var(--display);font-size:24px;font-weight:800;margin-top:4px}
+.station .bar{height:8px;border-radius:5px;background:var(--surface-2);margin:12px 0 8px;overflow:hidden;border:1px solid var(--line)}
+.station .bar span{display:block;height:100%;border-radius:5px;background:var(--accent)}
+.station.home{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.station.home .sub,.station.home .eyebrow{color:color-mix(in srgb,var(--bg) 72%,var(--ink))}
+.station.home .bar{background:color-mix(in srgb,var(--bg) 18%,var(--ink));border-color:transparent}
+.station.home .bar span{background:var(--sun)}
+.step{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font:700 12px var(--body);margin-right:6px}
+.station.home .step{background:var(--sun);color:#1b1404}
+
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap;background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line)}
+.pill.good{background:var(--good-soft);color:var(--good);border-color:transparent}
+.pill.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.pill.bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}
+.alert{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;padding:12px 14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line)}
+.alert .dot{width:10px;height:10px;border-radius:50%;margin-top:6px;background:var(--muted)}
+.alert.critical .dot{background:var(--bad)} .alert.warning .dot{background:var(--warn)} .alert.info .dot{background:var(--accent)}
+.alert .t{font-weight:600} .alert .d{grid-column:2;font-size:13.5px;color:var(--ink-2)}
+.safe .v{font-family:var(--display);font-size:44px;font-weight:800;line-height:1}
+.meter{height:10px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);position:relative}
+.meter span{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:6px}
+.meter i{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+.wins{display:grid;gap:10px}
+.win{display:flex;gap:12px;align-items:flex-start}
+.badge{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font:800 13px var(--display);background:var(--good-soft);color:var(--good)}
+.badge.next{background:var(--surface-2);color:var(--muted);border:1px dashed var(--line)}
+
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600}
+td.num,th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+tr.group td{padding-top:18px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;border-bottom:none}
+tr:last-child td{border-bottom:none}
+.linebar{height:6px;border-radius:4px;background:var(--surface-2);position:relative;min-width:90px;margin-top:6px}
+.linebar span{position:absolute;inset:0 auto 0 0;border-radius:4px;background:var(--accent)}
+.linebar span.over{background:var(--bad)}
+.linebar i{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink-2);opacity:.6}
+
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+select,input[type=number],input[type=search]{font:14px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:7px 10px;min-width:0;width:100%}
+.controls select{width:auto}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--ink-2);font:600 13px var(--body);padding:6px 12px;border-radius:8px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.field{display:grid;gap:6px}
+.field label{font-size:13px;font-weight:600;color:var(--ink-2);display:flex;justify-content:space-between;gap:8px}
+.field output{font-variant-numeric:tabular-nums;color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.calc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:24px}
+@media (max-width:820px){.calc{grid-template-columns:1fr}}
+.big{font-family:var(--display);font-size:34px;font-weight:800;line-height:1.05}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px 16px;font-size:14px;margin:0}
+.kv dt{color:var(--ink-2)} .kv dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.note{font-size:12.5px;color:var(--muted);margin:10px 0 0}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--ink-2);margin-top:10px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.compbar{display:flex;height:14px;border-radius:5px;overflow:hidden;gap:2px;margin:10px 0}
+.compbar span{display:block;height:100%}
+.guard{display:grid;grid-template-columns:1.2fr repeat(3,1fr);gap:16px;align-items:center;margin-top:20px}
+.guard .v{font:800 26px var(--display)}
+.guard.clean{border-color:var(--good)} .guard.leaky{border-color:var(--bad)}
+@media (max-width:640px){.guard{grid-template-columns:1fr 1fr}.guard>div:first-child{grid-column:1/-1}}
+#txTable tr.tap{cursor:pointer} #txTable tr.tap:hover td{background:var(--surface-2)}
+dialog#fix{border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);padding:20px;width:min(92vw,420px)}
+dialog#fix::backdrop{background:rgba(5,8,20,.55)}
+dialog#fix label{display:flex;gap:8px;align-items:center;margin:10px 0;font-size:14px}
+dialog#fix .row{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+dialog#fix button{font:600 14px var(--body);padding:9px 14px;border-radius:9px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);cursor:pointer}
+dialog#fix button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* insights */
+.insight{display:grid;gap:4px}
+.insight .k{font-family:var(--display);font-size:26px;font-weight:800;line-height:1.1}
+.insight p{margin:0;color:var(--ink-2);font-size:14px}
+.sankey svg{width:100%;height:auto;display:block}
+.sankey text{font:600 12px var(--body);fill:var(--ink)}
+.sankey text.v{font-weight:500;fill:var(--muted)}
+.heat{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,1fr);gap:3px;overflow-x:auto;padding-bottom:4px}
+.heat span{width:14px;height:14px;border-radius:3px;background:var(--heat0)}
+.heatwrap{display:flex;gap:8px}
+.heatdays{display:grid;grid-template-rows:repeat(7,14px);gap:3px;font-size:11px;color:var(--muted);line-height:14px}
+.scale{display:flex;gap:3px;align-items:center;font-size:11.5px;color:var(--muted);margin-top:10px}
+.scale span{width:14px;height:14px;border-radius:3px}
+@media (max-width:640px){
+  nav.tabs{position:fixed;top:auto;bottom:0;left:0;right:0;margin:0;border-bottom:0;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);background:var(--surface)}
+  nav .inner{gap:6px;padding-block:6px} .brand,#theme{display:none}
+  .tablist a{padding:9px 11px;font-size:13.5px}
+  .wrap{padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  #syncBtn{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:max(12px,env(safe-area-inset-right,0px));z-index:6}
+  .panel{padding:16px} .hero{gap:18px} .figs{gap:18px} .fig .v{font-size:24px}
+  .chart{height:250px} .safe .v{font-size:38px} h2{font-size:20px}
+  th,td{padding:8px 6px;font-size:13.5px}
+}
+.cal{display:grid;gap:8px}
+.cal .row{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border-radius:10px;background:var(--surface-2)}
+.cal .row.income{background:var(--good-soft)}
+.cal .day{font:800 15px var(--display);line-height:1.1;text-align:center}
+.cal .day small{display:block;font:600 10.5px var(--body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+footer{margin-top:40px;font-size:12.5px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.station .bar span,.meter span,.linebar span{transition:width .6s ease}}
+.road{grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))}
+.empty{padding:28px;text-align:center;color:var(--ink-2)}
+.empty a{color:var(--accent);font-weight:600}
+.dotr{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-left:6px;vertical-align:1px}
+.banner{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--warn-soft);color:var(--ink);border-radius:12px;padding:12px 16px;margin-bottom:18px;font-size:14px}
+.banner a{color:var(--accent);font-weight:600}
+</style>
+
+</head><body>
+<nav class="tabs" aria-label="Sections">
+  <div class="inner">
+    <div class="brand" id="brand"></div>
+    <div class="tablist" id="tablist">
+      <a href="#overview">Overview</a>
+      <a href="#plan">Plan</a>
+      <a href="#budget">Budget</a>
+      <a href="#spending">Spending</a>
+      <a href="#insights">Insights</a>
+      <a href="#recurring">Recurring</a>
+      <a href="#calculators">Calculators</a>
+      <a href="#accounts">Accounts</a>
+    </div>
+    <button class="iconbtn" id="syncBtn" type="button">Sync</button>
+    <button class="iconbtn" id="theme" type="button" aria-label="Switch between light and dark theme">Theme</button>
+  </div>
+</nav>
+
+<div class="wrap">
+<div id="banners"></div>
+
+<section data-view="overview">
+  <div class="hero">
+    <div>
+      <div class="eyebrow" id="asof"></div>
+      <h1 id="heroTitle"></h1>
+      <p class="lede" id="heroLede"></p>
+      <div class="figs" id="heroFigs"></div>
+    </div>
+    <div class="panel">
+      <div class="head"><h3>Net worth, now and projected</h3><span class="sub" id="heroSub"></span></div>
+      <div class="chart"><canvas id="heroChart" role="img" aria-label="Net worth projection with goal milestones"></canvas></div>
+    </div>
+  </div>
+  <div class="road" id="road"></div>
+  <div class="panel guard" id="guard"></div>
+  <div class="grid g3" style="margin-top:20px">
+    <div class="panel safe">
+      <div class="eyebrow">Safe to spend today</div>
+      <div class="v num" id="safeV" style="margin:8px 0 6px"></div>
+      <div class="sub" id="safeSub"></div>
+      <div class="meter" style="margin-top:14px"><span id="safeBar"></span><i id="safePace"></i></div>
+      <div class="sub" style="margin-top:8px">Bar is spent so far; the line is even pace for today. Bills are budgeted separately.</div>
+    </div>
+    <div class="panel">
+      <div class="head"><h3>Alerts</h3><span class="sub" id="alertCount"></span></div>
+      <div class="stack" id="alerts" style="gap:10px"></div>
+    </div>
+    <div class="panel">
+      <div class="head"><h3>Wins and milestones</h3></div>
+      <div class="wins" id="wins"></div>
+    </div>
+  </div>
+  <div class="grid g2" style="margin-top:20px">
+    <div class="panel">
+      <div class="head"><h3>This week</h3><span class="sub" id="recapRange"></span></div>
+      <div id="recap"></div>
+    </div>
+    <div class="panel">
+      <div class="head"><h3>Coming up, next 30 days</h3><span class="sub">Bills, paydays, due dates</span></div>
+      <div class="cal" id="cal"></div>
+    </div>
+  </div>
+</section>
+
+<section data-view="plan">
+  <div class="head"><div><div class="eyebrow">Savings plan</div><h2 id="planTitle">How your savings reach each goal</h2></div>
+    <div class="seg" role="group" aria-label="Plan order">
+      <button type="button" id="modeSeq" aria-pressed="true">One goal at a time</button>
+      <button type="button" id="modePar" aria-pressed="false">Split across goals</button>
+    </div>
+  </div>
+  <div class="grid g2">
+    <div class="panel">
+      <div class="field" style="margin-bottom:16px">
+        <label for="extra"><span>Extra saved per month, on top of <span id="baseMonthly"></span></span><output id="extraOut"></output></label>
+        <input type="range" id="extra" min="0" max="3000" step="50" value="0">
+      </div>
+      <div class="chart"><canvas id="planChart" role="img" aria-label="Goal progress over time"></canvas></div>
+      <p class="note" id="planNote"></p>
+    </div>
+    <div class="panel">
+      <h3 style="margin-bottom:10px">Timeline</h3>
+      <div class="scroll"><table id="planTable"></table></div>
+      <h3 style="margin:22px 0 10px">Debts</h3>
+      <div class="scroll"><table id="debtTable"></table></div>
+      <p class="note"><a href="/settings">Change goals, order or amounts in Settings</a></p>
+    </div>
+  </div>
+</section>
+
+<section data-view="budget">
+  <div class="head"><div><div class="eyebrow">Budget</div><h2 id="budgetTitle"></h2></div><span class="sub" id="budgetSub"></span></div>
+  <div class="panel" style="margin-bottom:20px"><div class="compbar" id="budgetBar"></div><div class="legend" id="budgetLegend"></div></div>
+  <div class="panel"><div class="scroll"><table id="budgetTable"></table></div><p class="note" id="budgetNote"></p></div>
+</section>
+
+<section data-view="spending">
+  <div class="panel" style="margin-bottom:20px">
+    <div class="head"><div><div class="eyebrow">Spending</div><h2>Month by month</h2></div>
+      <div class="controls"><select id="cardFilter" aria-label="Account"></select><label class="sub"><input type="checkbox" id="oneTime"> Include one-time</label></div>
+    </div>
+    <div class="chart"><canvas id="monthly" role="img" aria-label="Monthly spending by category"></canvas></div>
+  </div>
+  <div class="grid g2">
+    <div class="panel"><div class="head"><h3>By category</h3><div class="controls"><select id="monthFilter" aria-label="Period"></select></div></div><div class="scroll"><table id="catTable"></table></div></div>
+    <div class="panel"><div class="head"><h3>Top merchants</h3><span class="sub" id="merchNote"></span></div><div class="scroll"><table id="merchTable"></table></div></div>
+  </div>
+  <div class="panel" style="margin-top:20px">
+    <div class="head"><h3>Transactions</h3><div class="controls" style="flex:1;max-width:460px"><input type="search" id="search" placeholder="Search merchant, category or account" aria-label="Search transactions"><label class="sub" style="white-space:nowrap"><input type="checkbox" id="reviewOnly"> To review</label></div></div>
+    <p class="note" style="margin:0 0 10px">Tap a transaction to change its category or mark it one-time. A dot means Plaid wasn't sure of the category.</p>
+    <div class="scroll" style="max-height:460px;overflow-y:auto"><table id="txTable"></table></div>
+    <dialog id="fix"><form method="dialog" id="fixForm">
+      <h3 id="fixTitle" style="margin-bottom:4px"></h3><div class="sub" id="fixSub"></div>
+      <label style="display:block;margin-top:14px">Category<select id="fixCat" style="margin-top:6px"></select></label>
+      <input type="text" id="fixNew" placeholder="Or type a new category" style="font:14px var(--body);width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink)">
+      <label><input type="checkbox" id="fixOne"> One-time (keep it out of budgets and averages)</label>
+      <label><input type="radio" name="scope" value="one" checked> Just this transaction</label>
+      <label><input type="radio" name="scope" value="merchant"> Every transaction from <b id="fixMerch"></b></label>
+      <div class="sub" id="fixMsg"></div>
+      <div class="row"><button value="cancel" formnovalidate>Cancel</button><button class="primary" id="fixSave" value="save">Save</button></div>
+    </form></dialog>
+  </div>
+</section>
+
+<section data-view="insights">
+  <div class="head"><div><div class="eyebrow">Insights</div><h2>What your money has been doing</h2></div></div>
+  <div class="grid g4" id="insightCards" style="margin-bottom:20px"></div>
+  <div class="grid g2" style="margin-bottom:20px">
+    <div class="panel">
+      <div class="head"><h3>Kept each month</h3><span class="sub">Take-home minus spending and investing</span></div>
+      <div class="chart sm"><canvas id="keptChart" role="img" aria-label="Money kept per month"></canvas></div>
+      <p class="note" id="keptNote"></p>
+    </div>
+    <div class="panel">
+      <div class="head"><h3>Which days you spend</h3><span class="sub">Average flexible spending by weekday, last 6 months</span></div>
+      <div class="chart sm"><canvas id="dowChart" role="img" aria-label="Spending by day of week"></canvas></div>
+      <p class="note" id="dowNote"></p>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="head"><h3>Spending calendar</h3><span class="sub">Flexible spending per day, last 26 weeks. Bills and one-time costs left out.</span></div>
+    <div class="heatwrap"><div class="heatdays"><span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span></div><div class="heat" id="heat"></div></div>
+    <div class="scale">Less <span style="background:var(--heat0)"></span><span style="background:var(--heat1)"></span><span style="background:var(--heat2)"></span><span style="background:var(--heat3)"></span><span style="background:var(--heat4)"></span> More</div>
+  </div>
+</section>
+
+<section data-view="recurring">
+  <div class="head"><div><div class="eyebrow">Recurring</div><h2>Subscriptions and bills</h2></div><span class="sub" id="subNote"></span></div>
+  <div class="grid g4" id="subTiles" style="margin-bottom:20px"></div>
+  <div class="panel"><div class="scroll"><table id="subTable"></table></div><p class="note" id="subSource"></p></div>
+</section>
+
+<section data-view="calculators">
+  <div class="head"><div><div class="eyebrow">What if</div><h2>Calculators</h2></div><span class="sub">Change any assumption. Estimates, not financial advice.</span></div>
+  <div class="stack">
+    <div class="panel calc">
+      <div class="stack" style="gap:14px">
+        <h3>Net worth projector</h3>
+        <div class="field"><label for="nwRet">Investment return per year <output id="nwRetO"></output></label><input type="range" id="nwRet" min="0" max="12" step="0.5" value="7"></div>
+        <div class="field"><label for="nwInv">Invested per month <output id="nwInvO"></output></label><input type="range" id="nwInv" min="0" max="5000" step="50" value="0"></div>
+        <div class="field"><label for="nwAfter">Invested per month once goals are funded <output id="nwAfterO"></output></label><input type="range" id="nwAfter" min="0" max="8000" step="100" value="0"></div>
+        <div class="field"><label for="nwYears">Years <output id="nwYearsO"></output></label><input type="range" id="nwYears" min="3" max="30" step="1" value="15"></div>
+        <dl class="kv" id="nwKV"></dl>
+      </div>
+      <div><div class="chart"><canvas id="nwChart" role="img" aria-label="Net worth projection"></canvas></div><p class="note">Counts cash, investments and debts. Cars and home equity aren't counted unless you add them in Settings.</p></div>
+    </div>
+    <div class="grid g2">
+      <div class="panel">
+        <h3 style="margin-bottom:12px">Home affordability</h3>
+        <div class="grid g2" style="gap:12px">
+          <div class="field"><label for="hPrice">Price</label><input type="number" id="hPrice" value="350000" step="5000"></div>
+          <div class="field"><label for="hDown">Down payment %</label><input type="number" id="hDown" value="20" step="1"></div>
+          <div class="field"><label for="hRate">Mortgage rate %</label><input type="number" id="hRate" value="6.5" step="0.125"></div>
+          <div class="field"><label for="hTax">Property tax %</label><input type="number" id="hTax" value="1.2" step="0.1"></div>
+          <div class="field"><label for="hIns">Home insurance per year</label><input type="number" id="hIns" value="2000" step="100"></div>
+          <div class="field"><label for="hHoa">HOA per month</label><input type="number" id="hHoa" value="0" step="25"></div>
+        </div>
+        <div style="margin-top:16px"><div class="eyebrow">Monthly payment</div><div class="big num" id="hPay"></div><dl class="kv" id="hKV" style="margin-top:10px"></dl></div>
+      </div>
+      <div class="panel">
+        <h3 style="margin-bottom:12px">Cut a habit, invest the difference</h3>
+        <div class="stack" style="gap:14px">
+          <div class="field"><label for="cutWhat">Spending to trim</label><select id="cutWhat"></select></div>
+          <div class="field"><label for="cutAmt">Cut per month <output id="cutAmtO"></output></label><input type="range" id="cutAmt" min="0" max="1500" step="25" value="150"></div>
+          <div class="field"><label for="cutYrs">Invested for <output id="cutYrsO"></output></label><input type="range" id="cutYrs" min="1" max="30" step="1" value="10"></div>
+        </div>
+        <div style="margin-top:16px"><div class="eyebrow">Becomes</div><div class="big num" id="cutV"></div><p class="sub" id="cutSub"></p></div>
+      </div>
+    </div>
+    <div class="panel calc">
+      <div class="stack" style="gap:14px">
+        <h3>Compound growth</h3>
+        <div class="field"><label for="cgStart">Starting amount</label><input type="number" id="cgStart" value="5000" step="500"></div>
+        <div class="field"><label for="cgMo">Added per month <output id="cgMoO"></output></label><input type="range" id="cgMo" min="0" max="5000" step="50" value="300"></div>
+        <div class="field"><label for="cgRet">Return per year <output id="cgRetO"></output></label><input type="range" id="cgRet" min="0" max="12" step="0.5" value="7"></div>
+        <div class="field"><label for="cgYrs">Years <output id="cgYrsO"></output></label><input type="range" id="cgYrs" min="1" max="40" step="1" value="30"></div>
+        <dl class="kv" id="cgKV"></dl>
+      </div>
+      <div class="chart"><canvas id="cgChart" role="img" aria-label="Contributions versus growth"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<section data-view="accounts">
+  <div class="grid g2">
+    <div class="panel"><div class="head"><h3>What you own</h3><span class="num" id="assetTot"></span></div><div class="compbar" id="assetBar"></div><div class="legend" id="assetLegend"></div><div class="scroll"><table id="assetTable"></table></div></div>
+    <div class="panel"><div class="head"><h3>What you owe</h3><span class="num" id="liabTot"></span></div><div class="compbar" id="liabBar"></div><div class="legend" id="liabLegend"></div><div class="scroll"><table id="liabTable"></table></div></div>
+  </div>
+  <div class="panel" style="margin-top:20px"><div class="head"><h3>Investments</h3><span class="num" id="invTot"></span></div>
+    <div class="compbar" id="invBar"></div><div class="legend" id="invLegend"></div><p class="note" id="invNote"></p>
+    <div class="scroll" style="margin-top:12px"><table id="invTable"></table></div></div>
+  <div class="grid g2" style="margin-top:20px">
+    <div class="panel"><h3 style="margin-bottom:8px">Net worth history</h3><div class="chart sm"><canvas id="histChart" role="img" aria-label="Net worth over time"></canvas></div><p class="note">One point per day the app synced.</p></div>
+    <div class="panel"><h3 style="margin-bottom:8px">Connections</h3><div class="scroll"><table id="itemTable"></table></div><p class="note"><a href="/connect">Add, reconnect or disconnect banks</a></p></div>
+  </div>
+</section>
+
+<footer id="foot"></footer>
+</div>
+
+<script>
+const D = /*__DATA__*/null;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = (n, d = 0) => n == null || isNaN(n) ? '—' : (n < 0 ? '−' : '') + '$' + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+const fmtK = n => Math.abs(n) >= 1e6 ? '$' + (n / 1e6).toFixed(2) + 'M' : Math.abs(n) >= 1e3 ? '$' + Math.round(n / 1e3) + 'k' : fmt(n);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const ymd = s => new Date(s + (s.length === 7 ? '-15' : '') + 'T12:00:00');
+const monthLabel = (d, long) => d.toLocaleString('en-US', {month: long ? 'long' : 'short', year: 'numeric'});
+const addMonths = (d, n) => { const x = new Date(d); x.setMonth(x.getMonth() + n); return x; };
+const monthsBetween = (a, b) => Math.round((b - a) / 2.6298e9);
+const fv = (pv, pmt, r, n) => r ? pv * Math.pow(1 + r, n) + pmt * (Math.pow(1 + r, n) - 1) / r : pv + pmt * n;
+const today = ymd(D.app.as_of);
+const LIVE = location.protocol.startsWith('http');
+const SER = ['--s1', '--s2', '--s3', '--s4', '--s5', '--s6', '--s7', '--s8'];
+
+// ---------- core numbers ----------
+const ACC = D.accounts.filter(a => !a.hidden), B = D.budget, G = D.goals, PL = D.plan, INC = D.income;
+const sumBal = arr => arr.reduce((s, a) => s + (a.balance || 0), 0);
+const assets = sumBal(ACC.filter(a => !a.liability)), liabs = sumBal(ACC.filter(a => a.liability)), nw = assets - liabs;
+const invested = sumBal(ACC.filter(a => ['retirement', 'investments'].includes(a.kind)));
+const EF = G.find(g => g.kind === 'emergency') || null, DEBT = G.find(g => g.kind === 'debt') || null;
+const savingsBal = EF ? EF.saved : 0;
+const cashOther = sumBal(ACC.filter(a => !a.liability && !['retirement', 'investments'].includes(a.kind))) - savingsBal;
+const otherDebts = liabs - (DEBT ? DEBT.target : 0);
+const isOneTime = c => /\(one-time\)$/.test(c);
+const txAll = D.transactions;
+const thisMonth = D.app.as_of.slice(0, 7);
+const months = [...new Set(txAll.map(t => t.date.slice(0, 7)))].sort();
+const last12 = months.filter(m => m < thisMonth).slice(-12);
+const FIXED = new Set(['Housing', 'Utilities', 'Insurance', 'Loan payments', 'Childcare & education']);
+const debtApr = DEBT && DEBT.debts.length ? DEBT.debts.reduce((s, d) => s + (d.apr || 0) * d.balance, 0) / (DEBT.target || 1) / 100 : 0;
+const destination = [...G].reverse().find(g => g.kind !== 'debt') || G[G.length - 1] || null;
+
+// ---------- goal simulation ----------
+function simulate({monthly = PL.monthly_savings, extra = 0, mode = 'seq', months = 120} = {}) {
+  const b = G.map(g => ({id: g.id, kind: g.kind, target: g.target, bal: g.kind === 'debt' ? g.target : Math.min(g.saved || 0, g.target)}));
+  let spill = EF && EF.saved > EF.target ? EF.saved - EF.target : 0;  // savings beyond the emergency target go to the next goal
+  for (const x of b) if (spill > 0 && x.kind !== 'debt' && x.kind !== 'emergency') { const p = Math.min(spill, x.target - x.bal); x.bal += p; spill -= p; }
+  const ev = {}, series = [];
+  const done = x => x.kind === 'debt' ? x.bal <= 0.5 : x.bal >= x.target - 0.5;
+  b.forEach(x => { if (done(x)) ev[x.id] = today; });
+  for (let m = 1; m <= months; m++) {
+    let cash = monthly + extra;
+    for (const x of b) {
+      if (x.kind === 'debt') { if (x.bal > 0) x.bal = Math.max(0, x.bal * (1 + debtApr / 12) - (DEBT.min_payments || 0)); }
+      else x.bal += x.bal * PL.apy / 12;
+    }
+    const open = b.filter(x => !done(x));
+    if (mode === 'seq') {
+      for (const x of open) { if (cash <= 0) break; const need = x.kind === 'debt' ? x.bal : x.target - x.bal; const p = Math.min(cash, need); x.bal += x.kind === 'debt' ? -p : p; cash -= p; }
+    } else {
+      let pool = open.slice();
+      while (cash > 0.5 && pool.length) {
+        const share = cash / pool.length; cash = 0;
+        for (const x of pool) { const need = x.kind === 'debt' ? x.bal : x.target - x.bal; const p = Math.min(share, need); x.bal += x.kind === 'debt' ? -p : p; cash += share - p; }
+        pool = pool.filter(x => !done(x));
+      }
+    }
+    const d = addMonths(today, m);
+    b.forEach(x => { if (!ev[x.id] && done(x)) ev[x.id] = d; });
+    series.push({d, b: b.map(x => ({id: x.id, kind: x.kind, bal: x.bal})), leftover: cash});
+    if (b.every(done) && m > 24) { /* keep going so charts have a tail */ }
+  }
+  return {ev, series, spill};
+}
+function projectNW({ret = PL.return, invest = PL.invest_monthly, after = PL.invest_monthly + PL.monthly_savings, years = 15, extra = 0} = {}) {
+  const sim = simulate({extra, months: years * 12});
+  let inv = invested, post = 0, carry = sim.spill || 0;
+  const lastGoal = Object.values(sim.ev).length === G.length && G.length ? Math.max(...Object.values(sim.ev)) : null;
+  const pts = [{d: today, v: nw}];
+  for (let m = 1; m <= years * 12; m++) {
+    inv = inv * (1 + ret / 12) + invest;
+    const s = sim.series[m - 1], d = addMonths(today, m);
+    if (lastGoal && d > lastGoal) post = post * (1 + ret / 12) + after; else carry += s.leftover;
+    const saved = s.b.filter(x => x.kind !== 'debt').reduce((t, x) => t + x.bal, 0) - G.filter(g => g.kind !== 'debt').reduce((t, g) => t + (g.kind === 'emergency' ? 0 : g.saved || 0), 0);
+    const owed = s.b.filter(x => x.kind === 'debt').reduce((t, x) => t + x.bal, 0);
+    pts.push({d, v: inv + post + carry + saved + cashOther + (EF ? 0 : savingsBal) - owed - otherDebts});
+  }
+  return {pts, ev: sim.ev};
+}
+
+// ---------- theme ----------
+try { const t = localStorage.getItem('wp-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+$('#theme').onclick = () => {
+  const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('wp-theme', next); } catch (e) {}
+  renderAll();
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => renderAll());
+
+// ---------- charts ----------
+const charts = {};
+function chart(id, cfg) { if (charts[id]) charts[id].destroy(); charts[id] = new Chart(document.getElementById(id), cfg); return charts[id]; }
+function baseOpts(yfmt = fmtK) {
+  return {
+    maintainAspectRatio: false, animation: {duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450},
+    interaction: {mode: 'index', intersect: false},
+    scales: {
+      x: {grid: {display: false}, ticks: {color: css('--muted'), maxRotation: 0, autoSkipPadding: 18}, border: {color: css('--line')}},
+      y: {grid: {color: css('--line')}, border: {display: false}, ticks: {color: css('--muted'), callback: v => yfmt(v)}}
+    },
+    plugins: {legend: {display: false}, tooltip: {backgroundColor: css('--ink'), titleColor: css('--bg'), bodyColor: css('--bg'), footerColor: css('--bg'), padding: 10, cornerRadius: 8}}
+  };
+}
+const legendOpts = () => ({display: true, position: 'bottom', labels: {color: css('--ink-2'), boxWidth: 10, boxHeight: 10}});
+const areaFill = c => { const g = c.chart.ctx.createLinearGradient(0, 0, 0, c.chart.height || 300); g.addColorStop(0, css('--accent-soft')); g.addColorStop(1, 'rgba(0,0,0,0)'); return g; };
+Chart.register({id: 'flags', afterDatasetsDraw(c, _, o) {
+  if (!o || !o.items) return; const {ctx, chartArea: a, scales: {x}} = c;
+  o.items.forEach((f, i) => {
+    const px = x.getPixelForValue(f.index); if (px == null || px < a.left || px > a.right) return;
+    ctx.save(); ctx.strokeStyle = f.color; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(px, a.top + 16 + (i % 2) * 14); ctx.lineTo(px, a.bottom); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = f.color; ctx.font = '700 11px "Public Sans", system-ui, sans-serif';
+    const w = ctx.measureText(f.label).width;
+    ctx.fillText(f.label, Math.min(Math.max(px - w / 2, a.left), a.right - w), a.top + 10 + (i % 2) * 14); ctx.restore();
+  });
+}});
+const emptyState = (msg) => `<div class="empty">${msg}</div>`;
+
+// ---------- banners ----------
+function renderBanners() {
+  const out = [];
+  if (D.app.env !== 'production') out.push(`<div class="banner"><span><b>Test mode.</b> This is Plaid Sandbox data, not your real accounts.</span><span class="sub">Set PLAID_ENV=production to use real banks.</span></div>`);
+  if (!D.configured) out.push(`<div class="banner"><span>Tell the app your goals and it builds your plan.</span><a href="/settings">Set up goals</a></div>`);
+  const importing = D.items.filter(i => i.history === 'importing').map(i => i.institution);
+  if (importing.length) out.push(`<div class="banner"><span>Still importing history from ${esc(importing.join(', '))}. Averages and budgets fill in as it lands.</span></div>`);
+  $('#banners').innerHTML = out.join('');
+}
+
+// ---------- OVERVIEW ----------
+function renderOverview() {
+  const sim = simulate();
+  $('#asof').textContent = `${D.person.name ? D.person.name + ' · ' : ''}Balances as of ${today.toLocaleDateString('en-US', {month: 'long', day: 'numeric', year: 'numeric'})}`;
+  if (destination) {
+    const when = sim.ev[destination.id], by = destination.by ? ymd(destination.by) : null;
+    const whenTxt = when ? (when <= today ? 'now' : monthLabel(when, true)) : 'beyond ten years';
+    $('#heroTitle').innerHTML = `${esc(destination.name)} ready ${when && when <= today ? '' : 'by '}<em>${esc(whenTxt)}</em>.`;
+    const steps = G.map(g => g.kind === 'emergency' ? 'emergency fund' : g.kind === 'debt' ? 'debt' : g.name.toLowerCase());
+    const ahead = by && when ? monthsBetween(when, by) : null;
+    $('#heroLede').textContent = `Saving ${fmt(PL.monthly_savings)} a month: ${steps.join(', then ')}.` + (ahead == null ? '' : ahead >= 0 ? ` That's ${ahead} month${ahead === 1 ? '' : 's'} ahead of your target.` : ` That's ${-ahead} months behind your target; the Plan tab shows what closes the gap.`);
+  } else {
+    $('#heroTitle').innerHTML = `Net worth <em>${fmt(nw)}</em>.`;
+    $('#heroLede').innerHTML = LIVE ? 'Add a goal (an emergency fund, paying off debt, a down payment) and the app maps out when you get there. <a href="/settings" style="color:var(--accent)">Set goals</a>' : '';
+  }
+  const p2 = projectNW({years: 2});
+  $('#heroFigs').innerHTML = [['Net worth today', fmt(nw)], ['Projected in 2 years', fmt(p2.pts[24].v)], ['Saved and invested monthly', fmt(PL.monthly_savings + PL.invest_monthly)]]
+    .map(([l, v]) => `<div class="fig"><div class="v num">${v}</div><div class="l">${l}</div></div>`).join('');
+  $('#heroSub').textContent = `Plan as written, ${Math.round(PL.return * 100)}% return on investments`;
+  const endEv = Object.values(sim.ev).filter(Boolean);
+  const horizon = Math.max(30, (endEv.length ? monthsBetween(today, new Date(Math.max(...endEv))) : 36) + 10);
+  const pr = projectNW({years: Math.ceil(horizon / 12)}), pts = pr.pts.slice(0, horizon + 1);
+  const idx = d => d ? pts.findIndex(p => p.d >= d) : -1;
+  const o = baseOpts();
+  o.plugins.flags = {items: G.map((g, i) => ({index: idx(sim.ev[g.id]), label: g.kind === 'emergency' ? 'Emergency fund' : g.kind === 'debt' ? 'Debt-free' : g.name, color: css(g === destination ? '--sun' : i % 2 ? '--good' : '--accent')})).filter(f => f.index > 0)};
+  o.plugins.tooltip.callbacks = {label: i => ' Net worth ' + fmt(i.raw)};
+  chart('heroChart', {type: 'line', data: {labels: pts.map(p => p.d.toLocaleString('en-US', {month: 'short', year: '2-digit'})), datasets: [{data: pts.map(p => Math.round(p.v)), borderColor: css('--accent'), borderWidth: 2.5, pointRadius: 0, tension: .25, fill: true, backgroundColor: areaFill}]}, options: o});
+
+  $('#road').innerHTML = G.length ? G.map((g, i) => {
+    const when = sim.ev[g.id], left = when ? Math.max(0, monthsBetween(today, when)) : null;
+    const pct = g.kind === 'debt' ? 0 : Math.min(100, (g.kind === 'emergency' ? g.saved : g.saved || 0) / (g.target || 1) * 100);
+    const name = g.kind === 'emergency' ? 'Emergency fund' : g.kind === 'debt' ? 'Debt paid off' : g.name;
+    const sub = g.kind === 'emergency' ? `${fmt(g.saved)} of ${fmt(g.target)}, ${g.months} months of essentials` : g.kind === 'debt' ? `${fmt(g.target)} across ${g.debts.length} account${g.debts.length === 1 ? '' : 's'}` : g.kind === 'home' ? `${fmt(g.target)} = ${g.down_pct}% down + ${g.closing_pct}% closing on ${fmtK(g.price)}` : `${fmt(g.target)}${g.saved ? `, ${fmt(g.saved)} saved` : ''}`;
+    return `<div class="station${g === destination ? ' home' : ''}"><div class="eyebrow"><span class="step">${i + 1}</span>${esc(name)}</div>
+      <div class="when">${when ? (when <= today ? 'Done' : monthLabel(when)) : '—'}</div><div class="bar"><span style="width:${pct}%"></span></div>
+      <div class="sub">${esc(sub)}${left ? ` · ${left <= 1 ? 'next month' : 'in ' + left + ' months'}` : ''}</div></div>`;
+  }).join('') : '';
+  renderGuard();
+
+  const flex = B.lines.filter(l => l.group !== 'Fixed');
+  const budget = flex.reduce((s, l) => s + l.target, 0), spent = flex.reduce((s, l) => s + (l.actual[B.this_month] || 0), 0);
+  const dim = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate(), left = Math.max(0, budget - spent), daysLeft = dim - today.getDate() + 1;
+  $('#safeV').textContent = budget ? fmt(left / daysLeft) : '—';
+  $('#safeSub').textContent = budget ? `per day for the rest of ${today.toLocaleString('en-US', {month: 'long'})}. ${fmt(left)} left of your ${fmt(budget)} flexible budget.` : 'Appears once there is a month of spending.';
+  $('#safeBar').style.width = budget ? Math.min(100, spent / budget * 100) + '%' : '0';
+  $('#safePace').style.left = (today.getDate() / dim * 100) + '%';
+  const al = D.alerts || [];
+  $('#alertCount').textContent = al.length ? `${al.length} active` : '';
+  $('#alerts').innerHTML = al.length ? al.slice(0, 6).map(a => `<div class="alert ${a.level}"><span class="dot" aria-hidden="true"></span><div class="t">${esc(a.title)}</div><div class="d">${esc(a.detail)}</div></div>`).join('')
+    : `<div class="alert info"><span class="dot" aria-hidden="true"></span><div class="t">All clear</div><div class="d">No category is ahead of pace and nothing has left savings this month. Alerts watch budget pace, savings withdrawals, big charges, new subscriptions, due dates and bank connections.</div></div>`;
+  const cnt = al.filter(a => a.level !== 'info').length;
+  document.querySelector('#tablist a[href="#overview"]').innerHTML = 'Overview' + (cnt ? `<span class="count">${cnt}</span>` : '');
+  const MS = [1e4, 25e3, 5e4, 1e5, 25e4, 5e5, 1e6, 2e6], passed = MS.filter(m => nw >= m).pop(), next = MS.find(m => nw < m);
+  const cards = ACC.filter(a => a.kind === 'credit_card' && a.limit), cBal = sumBal(cards), cLim = cards.reduce((s, a) => s + a.limit, 0), util = cLim ? cBal / cLim * 100 : null;
+  const out = D.flows.filter(f => f.kind === 'savings_out' && f.date.startsWith(thisMonth)).length;
+  const kept = keptByMonth().slice(-3);
+  $('#wins').innerHTML = [
+    {ok: !!passed, t: passed ? `Net worth past ${fmtK(passed)}` : `Next stop: ${fmtK(next)}`, d: `${fmt(nw)} today.${next ? ` Next milestone ${fmtK(next)}.` : ''}`},
+    EF && {ok: EF.saved >= EF.essential_monthly * 3, t: `${(EF.saved / (EF.essential_monthly || 1)).toFixed(1)} months of essentials saved`, d: `${EF.months} is the goal.`},
+    util != null && {ok: util < 10, t: `Card utilization ${util.toFixed(1)}%`, d: `${fmt(cBal)} owed on ${fmt(cLim)} of limits. Under 10% helps your credit score.`},
+    {ok: out === 0, t: out ? 'Savings got tapped this month' : 'Savings untouched this month', d: out ? 'Each withdrawal pushes your goals back.' : 'Every dollar stayed on the plan.'},
+    kept.length && {ok: kept.every(k => k > 0), t: kept.every(k => k > 0) ? `Kept money ${kept.length} months running` : 'A month ran negative recently', d: 'Months: ' + kept.map(k => fmt(k)).join(', ')},
+    DEBT && {ok: false, t: 'Debt-free', d: simulate().ev.debt ? `On pace for ${monthLabel(simulate().ev.debt)}.` : 'Set your monthly savings in Settings to see when.'},
+  ].filter(Boolean).map(w => `<div class="win"><div class="badge${w.ok ? '' : ' next'}" aria-hidden="true">${w.ok ? '✓' : '→'}</div><div><div style="font-weight:600">${esc(w.t)}</div><div class="sub">${esc(w.d)}</div></div></div>`).join('');
+  renderWeek();
+}
+function renderGuard() {
+  const fl = D.flows, out = fl.filter(x => x.kind === 'savings_out'), inn = fl.filter(x => x.kind === 'savings_in');
+  const g = $('#guard');
+  if (!EF && !out.length && !inn.length) { g.hidden = true; return; }
+  const yr = D.app.as_of.slice(0, 4), sum = a => a.reduce((s, x) => s + x.amount, 0);
+  const mOut = sum(out.filter(x => x.date.startsWith(thisMonth))), yOut = sum(out.filter(x => x.date.startsWith(yr))), mIn = sum(inn.filter(x => x.date.startsWith(thisMonth)));
+  const last = out.map(x => x.date).sort().pop(), days = last ? Math.round((today - ymd(last)) / 864e5) : null;
+  g.className = 'panel guard ' + (mOut ? 'leaky' : 'clean');
+  g.innerHTML = `<div><div class="eyebrow">Savings guard</div><div style="font-weight:600;margin-top:4px">${mOut ? `${fmt(mOut)} left savings this month.` : 'Nothing has left savings this month. Keep it that way.'}</div>
+      <div class="sub">${days != null ? `${days} days since the last withdrawal. ` : ''}You get an alert when money moves out.</div></div>
+    <div><div class="v num ${mOut ? 'bad' : 'good'}">${fmt(mOut)}</div><div class="sub">Pulled this month</div></div>
+    <div><div class="v num">${fmt(mIn)}</div><div class="sub">Added this month</div></div>
+    <div><div class="v num${yOut ? ' bad' : ''}">${fmt(yOut)}</div><div class="sub">Pulled in ${yr}</div></div>`;
+}
+function renderWeek() {
+  const start = new Date(today); start.setDate(start.getDate() - 6); const s = start.toISOString().slice(0, 10);
+  const wk = txAll.filter(t => t.date >= s && t.date <= D.app.as_of && t.amount > 0 && !FIXED.has(t.category) && !isOneTime(t.category));
+  const total = wk.reduce((a, t) => a + t.amount, 0), weekly = B.lines.filter(l => l.group !== 'Fixed').reduce((a, l) => a + l.target, 0) * 12 / 52;
+  const by = {}; wk.forEach(t => by[t.category] = (by[t.category] || 0) + t.amount);
+  const top = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 3), pct = weekly ? total / weekly : 0;
+  $('#recapRange').textContent = `${start.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})} – ${today.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}`;
+  $('#recap').innerHTML = `<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><div class="big num">${fmt(total)}</div>${weekly ? `<span class="pill ${pct <= 1 ? 'good' : 'bad'}">${pct <= 1 ? fmt(weekly - total) + ' under' : fmt(total - weekly) + ' over'} a ${fmt(weekly)} week</span>` : ''}</div>
+    <div class="meter" style="margin:14px 0 12px"><span style="width:${Math.min(100, pct * 100)}%;background:var(${pct <= 1 ? '--good' : '--bad'})"></span></div>
+    <dl class="kv">${top.map(([c, v]) => `<dt>${esc(c)}</dt><dd>${fmt(v)}</dd>`).join('')}</dl>
+    <p class="note">${wk.length} flexible purchases. Bills and one-time costs aren't counted.</p>`;
+  const cal = D.calendar || [];
+  $('#cal').innerHTML = cal.length ? cal.slice(0, 10).map(e => { const d = ymd(e.date);
+    return `<div class="row${e.kind === 'income' ? ' income' : ''}"><div class="day">${d.getDate()}<small>${d.toLocaleString('en-US', {month: 'short'})}</small></div>
+      <div><div style="font-weight:600">${esc(e.name)}</div><div class="sub">${esc(e.kind === 'income' ? 'Expected deposit' : e.kind === 'due' ? 'Payment due' : e.kind)}</div></div>
+      <div class="num" style="font-weight:600">${e.amount == null ? '<span class="sub">check</span>' : e.amount < 0 ? `<span class="good">+${fmt(-e.amount)}</span>` : fmt(e.amount)}</div></div>`; }).join('')
+    : '<p class="sub">Nothing expected in the next 30 days yet.</p>';
+}
+
+// ---------- PLAN ----------
+let planMode = 'seq';
+$('#modeSeq').onclick = () => { planMode = 'seq'; $('#modeSeq').setAttribute('aria-pressed', 'true'); $('#modePar').setAttribute('aria-pressed', 'false'); renderPlan(); };
+$('#modePar').onclick = () => { planMode = 'par'; $('#modePar').setAttribute('aria-pressed', 'true'); $('#modeSeq').setAttribute('aria-pressed', 'false'); renderPlan(); };
+$('#extra').oninput = () => renderPlan();
+function renderPlan() {
+  const extra = +$('#extra').value;
+  $('#baseMonthly').textContent = fmt(PL.monthly_savings); $('#extraOut').textContent = fmt(extra);
+  if (!G.length) { $('#planTable').innerHTML = `<tr><td>${LIVE ? '<a href="/settings">Add a goal in Settings</a> to see a timeline.' : 'No goals yet.'}</td></tr>`; $('#debtTable').innerHTML = ''; return; }
+  const sim = simulate({extra, mode: planMode}), base = simulate({mode: planMode});
+  const end = Math.min(119, Math.max(24, ...Object.values(sim.ev).filter(Boolean).map(d => monthsBetween(today, d) + 6)));
+  const pts = sim.series.slice(0, end);
+  const o = baseOpts(); o.plugins.legend = legendOpts(); o.plugins.tooltip.callbacks = {label: i => ` ${i.dataset.label}: ${fmt(i.raw)}`};
+  chart('planChart', {type: 'line', data: {labels: pts.map(p => p.d.toLocaleString('en-US', {month: 'short', year: '2-digit'})),
+    datasets: G.map((g, i) => ({label: g.kind === 'debt' ? 'Debt left' : g.kind === 'emergency' ? 'Emergency fund' : g.name, data: pts.map(p => Math.round(p.b[i].bal)),
+      borderColor: css(g.kind === 'debt' ? '--bad' : SER[i % 8]), borderWidth: 2, pointRadius: 0, tension: .2, borderDash: g.kind === 'debt' ? [5, 4] : []}))}, options: o});
+  const rows = G.map(g => {
+    const w = sim.ev[g.id], b0 = base.ev[g.id], by = g.by ? ymd(g.by) : null;
+    const status = !by ? '' : w && w <= by ? '<span class="pill good">on time</span>' : '<span class="pill bad">late</span>';
+    const mLeft = by ? Math.max(1, monthsBetween(today, by)) : null, need = g.kind === 'debt' ? g.target : g.target - (g.kind === 'emergency' ? g.saved : g.saved || 0);
+    const gain = extra && w && b0 ? monthsBetween(w, b0) : 0;
+    return `<tr><td>${esc(g.kind === 'debt' ? 'Pay off debt' : g.kind === 'emergency' ? 'Emergency fund' : g.name)}${by ? `<div class="sub">Target ${monthLabel(by)}${mLeft ? ` · needs ${fmt(Math.max(0, need) / mLeft)}/mo alone` : ''}</div>` : ''}</td>
+      <td class="num">${fmt(g.target)}</td><td class="num">${w ? (w <= today ? 'Done' : monthLabel(w)) : '10+ yrs'}${gain > 0 ? `<div class="sub good">${gain} mo sooner</div>` : ''}</td><td>${status}</td></tr>`;
+  }).join('');
+  $('#planTable').innerHTML = `<tr><th>Goal</th><th class="num">Amount</th><th class="num">Reached</th><th></th></tr>` + rows;
+  $('#planNote').textContent = planMode === 'seq' ? 'One goal at a time: every dollar goes to the current goal, then rolls to the next. Usually the fastest way to finish the first ones.' : 'Split: each month is divided evenly across unfinished goals. Slower to finish any one goal, but all of them move.';
+  const debts = DEBT ? DEBT.debts : [];
+  $('#debtTable').innerHTML = debts.length ? `<tr><th>Account</th><th class="num">Balance</th><th class="num">APR</th><th class="num">Minimum</th></tr>` + debts.map(d => `<tr><td>${esc(d.name)}${d.next_due ? `<div class="sub">Due ${d.next_due}</div>` : ''}</td><td class="num">${fmt(d.balance)}</td><td class="num">${d.apr != null ? d.apr + '%' : '<span class="muted">?</span>'}</td><td class="num">${d.min_payment ? fmt(d.min_payment, 2) : '—'}</td></tr>`).join('') + '<tr><td colspan="4" class="sub">Pay the highest rate first (avalanche) to pay the least interest.</td></tr>'
+    : '<tr><td class="sub">No debts selected.</td></tr>';
+}
+
+// ---------- BUDGET ----------
+function renderBudget() {
+  const dim = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate(), pace = today.getDate() / dim;
+  const tot = B.lines.reduce((s, l) => s + l.target, 0), income = INC.monthly;
+  $('#budgetTitle').textContent = income ? `${fmt(income)} a month take-home` : 'Your monthly budget';
+  $('#budgetSub').textContent = B.suggested ? 'Suggested from your last three months.' : '';
+  const parts = [['Bills', B.lines.filter(l => l.group === 'Fixed').reduce((s, l) => s + l.target, 0), '--s2'], ['Everyday', B.lines.filter(l => l.group !== 'Fixed').reduce((s, l) => s + l.target, 0), '--s4'],
+    ['Investing', PL.invest_monthly, '--s7'], ['Goals', PL.monthly_savings, '--s3']];
+  const left = income - parts.reduce((s, p) => s + p[1], 0); if (left > 1) parts.push(['Unassigned', left, '--other']);
+  const base = Math.max(income, parts.reduce((s, p) => s + p[1], 0)) || 1;
+  $('#budgetBar').innerHTML = parts.filter(p => p[1] > 0).map(([k, v, c]) => `<span title="${k}: ${fmt(v)}" style="width:${v / base * 100}%;background:var(${c})"></span>`).join('');
+  $('#budgetLegend').innerHTML = parts.filter(p => p[1] > 0).map(([k, v, c]) => `<span><i style="background:var(${c})"></i>${k} ${fmt(v)}</span>`).join('') + (left < -1 ? `<span class="bad">Over by ${fmt(-left)}</span>` : '');
+  if (!B.lines.length) { $('#budgetTable').innerHTML = `<tr><td>${emptyState('Budget lines appear after a month of transactions.')}</td></tr>`; return; }
+  let rows = `<tr><th>Category</th><th class="num">Plan</th><th style="min-width:150px">${today.toLocaleString('en-US', {month: 'long'})} so far</th><th class="num">3-mo avg</th><th></th></tr>`, grp = '';
+  B.lines.forEach(l => {
+    if (l.group !== grp) { grp = l.group; rows += `<tr class="group"><td colspan="5">${esc(grp === 'Fixed' ? 'Bills' : 'Everyday')}</td></tr>`; }
+    const mtd = l.actual[B.this_month] || 0, over = l.avg - l.target, tol = Math.max(25, l.target * .1);
+    const pill = l.group === 'Fixed' ? '' : over > tol ? `<span class="pill bad">avg ${fmt(over)} over</span>` : over < -tol ? '<span class="pill good">under</span>' : '<span class="pill">on plan</span>';
+    rows += `<tr><td>${esc(l.name)}</td><td class="num">${fmt(l.target)}</td><td><div class="num" style="font-size:13px">${fmt(mtd)}</div><div class="linebar"><span class="${mtd > l.target ? 'over' : ''}" style="width:${l.target ? Math.min(100, mtd / l.target * 100) : 0}%"></span>${l.group !== 'Fixed' ? `<i style="left:${pace * 100}%"></i>` : ''}</div></td><td class="num muted">${fmt(l.avg)}</td><td>${pill}</td></tr>`;
+  });
+  $('#budgetTable').innerHTML = rows;
+  $('#budgetNote').innerHTML = (B.unbudgeted.length ? `Not in the budget yet: ${B.unbudgeted.map(esc).join(', ')}. ` : '') + (LIVE ? '<a href="/settings">Edit budget in Settings</a>' : '');
+}
+
+// ---------- SPENDING ----------
+const accts = [...new Set(txAll.map(t => t.account))].sort();
+$('#cardFilter').innerHTML = '<option value="">All accounts</option>' + accts.map(a => `<option>${esc(a)}</option>`).join('');
+$('#monthFilter').innerHTML = `<option value="12">Last ${last12.length || 1} months, per month</option>` + [thisMonth, ...[...last12].reverse()].map(m => `<option value="${m}">${monthLabel(ymd(m))}</option>`).join('');
+const spendRows = () => { const a = $('#cardFilter').value; return txAll.filter(t => (!a || t.account === a) && ($('#oneTime').checked || !isOneTime(t.category))); };
+['#cardFilter', '#oneTime', '#monthFilter'].forEach(s => $(s).onchange = renderSpending);
+$('#search').oninput = renderTx; $('#reviewOnly').onchange = renderTx;
+function renderSpending() {
+  const rows = spendRows(), win = last12.concat(thisMonth), tot = {};
+  rows.filter(t => win.includes(t.date.slice(0, 7))).forEach(t => tot[t.category] = (tot[t.category] || 0) + t.amount);
+  const top = Object.keys(tot).filter(c => c !== 'Other' && tot[c] > 0).sort((a, b) => tot[b] - tot[a]).slice(0, 7), cats = [...top, 'Everything else'];
+  const o = baseOpts(); o.scales.x.stacked = o.scales.y.stacked = true; o.plugins.legend = legendOpts();
+  o.plugins.tooltip.itemSort = (a, b) => b.raw - a.raw; o.plugins.tooltip.filter = i => i.raw > .5;
+  o.plugins.tooltip.callbacks = {label: i => ` ${i.dataset.label}: ${fmt(i.raw)}`, footer: it => 'Total ' + fmt(it.reduce((s, i) => s + i.raw, 0))};
+  chart('monthly', {type: 'bar', data: {labels: win.map(m => ymd(m).toLocaleString('en-US', {month: 'short', year: '2-digit'})), datasets: cats.map((c, i) => ({
+    label: c, data: win.map(m => Math.max(0, rows.filter(t => t.date.startsWith(m) && (top.includes(t.category) ? t.category : 'Everything else') === c).reduce((s, t) => s + t.amount, 0))),
+    backgroundColor: c === 'Everything else' ? css('--other') : css(SER[i]), borderColor: css('--surface'), borderWidth: {top: 2}, borderSkipped: false, borderRadius: 2}))}, options: o});
+  const sel = $('#monthFilter').value, div = sel === '12' ? Math.max(1, last12.length) : 1;
+  const w = rows.filter(t => sel === '12' ? last12.includes(t.date.slice(0, 7)) : t.date.startsWith(sel));
+  const by = {}; w.forEach(t => by[t.category] = (by[t.category] || 0) + t.amount);
+  const sum = Object.values(by).reduce((a, b) => a + b, 0) || 1;
+  $('#catTable').innerHTML = `<tr><th>Category</th><th class="num">${sel === '12' ? 'Per month' : 'Total'}</th><th class="num">Share</th></tr>` +
+    Object.entries(by).sort((a, b) => b[1] - a[1]).map(([c, v]) => `<tr><td>${esc(c)}</td><td class="num">${fmt(v / div)}</td><td class="num muted">${Math.round(v / sum * 100)}%</td></tr>`).join('') +
+    `<tr><td><b>Total</b></td><td class="num"><b>${fmt(sum / div)}</b></td><td></td></tr>`;
+  const mb = {};
+  w.forEach(t => { const k = t.desc.slice(0, 28); (mb[k] ||= {v: 0, n: 0, c: t.category}); mb[k].v += t.amount; mb[k].n++; });
+  $('#merchNote').textContent = sel === '12' ? `Last ${last12.length} months` : monthLabel(ymd(sel));
+  $('#merchTable').innerHTML = `<tr><th>Merchant</th><th>Category</th><th class="num">Visits</th><th class="num">Total</th></tr>` +
+    Object.entries(mb).sort((a, b) => b[1].v - a[1].v).slice(0, 15).map(([k, o]) => `<tr><td>${esc(k)}</td><td class="muted">${esc(o.c)}</td><td class="num muted">${o.n}</td><td class="num">${fmt(o.v)}</td></tr>`).join('');
+  renderTx();
+}
+function renderTx() {
+  const q = $('#search').value.trim().toLowerCase(), rv = $('#reviewOnly').checked;
+  const rows = [...txAll].reverse().filter(t => (!rv || t.review) && (!q || (t.desc + ' ' + t.category + ' ' + t.account).toLowerCase().includes(q))).slice(0, 300);
+  $('#txTable').innerHTML = `<tr><th>Date</th><th>Description</th><th>Category</th><th>Account</th><th class="num">Amount</th></tr>` +
+    rows.map(t => `<tr${LIVE ? ` class="tap" data-id="${esc(t.id)}"` : ''}><td class="muted num" style="white-space:nowrap">${t.date}${t.pending ? ' <span class="pill">pending</span>' : ''}</td><td>${esc(t.desc)}</td><td class="muted">${esc(t.category)}${t.review ? '<span class="dotr" title="Plaid wasn\'t sure"></span>' : ''}</td><td class="muted">${esc(t.account)}</td><td class="num${t.amount < 0 ? ' good' : ''}">${fmt(t.amount, 2)}</td></tr>`).join('');
+}
+let fixing = null;
+function openFix(id) {
+  const t = txAll.find(x => x.id === id); if (!t) return; fixing = t;
+  $('#fixTitle').textContent = t.desc; $('#fixSub').textContent = `${t.date} · ${t.account} · ${fmt(t.amount, 2)}`;
+  const strip = c => c.replace(/ \(one-time\)$/, '');
+  const cats = [...new Set(txAll.map(x => strip(x.category)).concat(['Not spending', 'Groceries', 'Dining', 'Shopping', 'Transportation', 'Travel', 'Entertainment', 'Health', 'Housing', 'Utilities', 'Subscriptions', 'Gifts']))].sort();
+  $('#fixCat').innerHTML = cats.map(c => `<option${c === strip(t.category) ? ' selected' : ''}>${esc(c)}</option>`).join('');
+  $('#fixNew').value = ''; $('#fixOne').checked = isOneTime(t.category); $('#fixMsg').textContent = '';
+  $('#fixMerch').textContent = t.desc; document.querySelector('#fixForm [value=one]').checked = true;
+  $('#fix').showModal();
+}
+if (LIVE) {
+  $('#txTable').addEventListener('click', e => { const tr = e.target.closest('tr.tap'); if (tr) openFix(tr.dataset.id); });
+  $('#fixSave').addEventListener('click', async e => {
+    e.preventDefault();
+    let cat = $('#fixNew').value.trim() || $('#fixCat').value;
+    if ($('#fixOne').checked && cat !== 'Not spending') cat += ' (one-time)';
+    const scope = document.querySelector('#fixForm [name=scope]:checked').value;
+    $('#fixSave').disabled = true; $('#fixMsg').textContent = 'Saving and recalculating…';
+    try {
+      const r = await fetch('/api/override', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: fixing.id, desc: fixing.desc, category: cat, scope})});
+      if (!r.ok) throw 0; location.reload();
+    } catch (err) { $('#fixMsg').textContent = "Couldn't save. Check your connection and try again."; $('#fixSave').disabled = false; }
+  });
+}
+
+// ---------- INSIGHTS ----------
+function keptByMonth() {
+  return last12.map(m => D.flows.filter(f => f.kind === 'income' && f.date.startsWith(m)).reduce((s, f) => s + f.amount, 0)
+    - txAll.filter(t => t.date.startsWith(m)).reduce((s, t) => s + t.amount, 0)
+    - D.flows.filter(f => f.kind === 'invest' && f.date.startsWith(m)).reduce((s, f) => s + f.amount, 0));
+}
+function renderInsights() {
+  const kept = keptByMonth(), inc12 = last12.map(m => D.flows.filter(f => f.kind === 'income' && f.date.startsWith(m)).reduce((s, f) => s + f.amount, 0));
+  const r3 = last12.slice(-3), p3 = last12.slice(-6, -3);
+  const catAvg = ms => { const o = {}; txAll.filter(t => ms.includes(t.date.slice(0, 7)) && !isOneTime(t.category)).forEach(t => o[t.category] = (o[t.category] || 0) + t.amount / (ms.length || 1)); return o; };
+  const now = catAvg(r3), before = catAvg(p3);
+  const deltas = Object.keys(now).filter(c => before[c] != null && !FIXED.has(c)).map(c => [c, now[c] - before[c]]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  const avgSpend = Object.values(now).reduce((a, b) => a + b, 0), rate = inc12.slice(-3).reduce((a, b) => a + b, 0) ? kept.slice(-3).reduce((a, b) => a + b, 0) / inc12.slice(-3).reduce((a, b) => a + b, 0) : null;
+  const subsM = D.subscriptions.filter(s => s.active && s.kind === 'subscription').reduce((s, x) => s + x.monthly, 0);
+  const card = (k, t, p) => `<div class="panel insight"><div class="eyebrow">${t}</div><div class="k num">${k}</div><p>${p}</p></div>`;
+  $('#insightCards').innerHTML = [
+    card(fmt(avgSpend), 'Monthly spending', 'Average of the last three months, one-time costs left out.'),
+    card(rate == null ? '—' : Math.round(rate * 100) + '%', 'Savings rate', 'Share of take-home kept after spending and investing, last three months.'),
+    deltas.length ? card((deltas[0][1] > 0 ? '+' : '−') + fmt(Math.abs(deltas[0][1])), `${esc(deltas[0][0])}, per month`, deltas[0][1] > 0 ? 'The biggest increase versus the three months before.' : 'The biggest drop versus the three months before. Nice.') : card('—', 'Biggest change', 'Needs six months of history.'),
+    card(fmt(subsM), 'Subscriptions', `${fmt(subsM * 12)} a year. Check the Recurring tab for ones you don't use.`),
+  ].join('');
+  const o = baseOpts(); o.plugins.tooltip.callbacks = {label: i => ' Kept ' + fmt(i.raw)};
+  chart('keptChart', {type: 'bar', data: {labels: last12.map(m => ymd(m).toLocaleString('en-US', {month: 'short'})), datasets: [{data: kept.map(Math.round), backgroundColor: kept.map(k => css(k >= 0 ? '--good' : '--bad')), borderRadius: 3}]}, options: o});
+  $('#keptNote').textContent = kept.length ? `Last three months: ${kept.slice(-3).map(v => fmt(v)).join(', ')}. Under the plan you'd keep about ${fmt(PL.monthly_savings)} a month.` : '';
+  const since = addMonths(today, -6).toISOString().slice(0, 10), flexTx = txAll.filter(t => t.date >= since && t.amount > 0 && !FIXED.has(t.category) && !isOneTime(t.category));
+  const dow = Array(7).fill(0), weeks = 26;
+  flexTx.forEach(t => dow[ymd(t.date).getDay()] += t.amount);
+  const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], order = [1, 2, 3, 4, 5, 6, 0];
+  const o2 = baseOpts(); o2.plugins.tooltip.callbacks = {label: i => ' ' + fmt(i.raw) + ' average'};
+  chart('dowChart', {type: 'bar', data: {labels: order.map(i => names[i]), datasets: [{data: order.map(i => Math.round(dow[i] / weeks)), backgroundColor: css('--s1'), borderRadius: 3}]}, options: o2});
+  const peak = order.reduce((a, i) => dow[i] > dow[a] ? i : a, 1);
+  $('#dowNote').textContent = flexTx.length ? `${names[peak]} is your biggest spending day: about ${fmt(dow[peak] / weeks)} on average.` : '';
+  const byDay = {}; flexTx.forEach(t => byDay[t.date] = (byDay[t.date] || 0) + t.amount);
+  const vals = Object.values(byDay).sort((a, b) => a - b), q = p => vals[Math.floor(p * (vals.length - 1))] || 0, cuts = [q(.25), q(.5), q(.75), q(.92)];
+  const start = new Date(today); start.setDate(start.getDate() - 7 * 26 - ((start.getDay() + 6) % 7));
+  let cells = '';
+  for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+    const k = d.toISOString().slice(0, 10), v = byDay[k] || 0, lvl = !v ? 0 : 1 + cuts.filter(c => v > c).length;
+    cells += `<span style="background:var(--heat${Math.min(4, lvl)})" title="${k}: ${fmt(v)}"></span>`;
+  }
+  $('#heat').innerHTML = cells;
+}
+
+// ---------- RECURRING ----------
+function renderRecurring() {
+  const S = D.subscriptions, act = S.filter(s => s.active);
+  const subs = act.filter(s => s.kind === 'subscription'), bills = act.filter(s => s.kind === 'bill');
+  const t = arr => arr.reduce((s, x) => s + x.monthly, 0);
+  $('#subTiles').innerHTML = [['Subscriptions', fmt(t(subs)), `${subs.length} active`], ['Bills', fmt(t(bills)), `${bills.length} active`], ['Per year', fmt((t(subs) + t(bills)) * 12), 'All recurring'], ['Stopped', S.length - act.length, 'Nothing in 45+ days']]
+    .map(([a, b, c]) => `<div class="panel insight"><div class="eyebrow">${a}</div><div class="k num">${b}</div><p>${c}</p></div>`).join('');
+  $('#subTable').innerHTML = S.length ? `<tr><th>Name</th><th>Category</th><th class="num">Monthly</th><th class="num">Last charge</th><th class="num">Next</th></tr>` + S.map(s => `<tr${s.active ? '' : ' class="muted"'}><td>${esc(s.name)}${s.confidence !== 'recurring' ? ' <span class="pill">likely</span>' : ''}<div class="sub">${esc(s.account)}${s.frequency && s.frequency !== 'monthly' ? ' · ' + esc(s.frequency) : ''}</div></td><td class="muted">${esc(s.category)}</td><td class="num">${fmt(s.monthly, 2)}</td><td class="num muted">${s.last_date || '—'}</td><td class="num muted">${s.active && s.next_date ? s.next_date : '—'}</td></tr>`).join('')
+    : `<tr><td>${emptyState('Recurring charges show up after a couple of months of history.')}</td></tr>`;
+  $('#subSource').textContent = S.some(s => s.source === 'plaid') ? 'Detected by Plaid from your full history.' : 'Found by spotting charges that repeat month to month. "Likely" means only two months seen so far.';
+  $('#subNote').textContent = `${fmt(t(act))} a month`;
+}
+
+// ---------- CALCULATORS ----------
+const calcIds = ['nwRet', 'nwInv', 'nwAfter', 'nwYears', 'hPrice', 'hDown', 'hRate', 'hTax', 'hIns', 'hHoa', 'cutWhat', 'cutAmt', 'cutYrs', 'cgStart', 'cgMo', 'cgRet', 'cgYrs'];
+$('#nwInv').value = Math.round(PL.invest_monthly / 50) * 50; $('#nwAfter').value = Math.min(8000, Math.round((PL.invest_monthly + PL.monthly_savings) / 100) * 100); $('#nwRet').value = PL.return * 100;
+const homeGoal = G.find(g => g.kind === 'home'); if (homeGoal) { $('#hPrice').value = homeGoal.price; $('#hDown').value = homeGoal.down_pct; }
+$('#cutWhat').innerHTML = Object.entries(B.averages || {}).filter(([c]) => !FIXED.has(c)).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([c, v]) => `<option value="${Math.round(v)}">${esc(c)} (${fmt(v)}/mo)</option>`).join('');
+$('#cutWhat').onchange = () => { $('#cutAmt').value = Math.round(+$('#cutWhat').value * .3 / 25) * 25; renderCalcs(); };
+calcIds.forEach(id => $('#' + id).addEventListener('input', () => renderCalcs()));
+function renderCalcs() {
+  const out = (id, v) => { const e = $('#' + id + 'O'); if (e) e.textContent = v; };
+  out('nwRet', $('#nwRet').value + '%'); out('nwInv', fmt(+$('#nwInv').value)); out('nwAfter', fmt(+$('#nwAfter').value)); out('nwYears', $('#nwYears').value);
+  out('cutAmt', fmt(+$('#cutAmt').value)); out('cutYrs', $('#cutYrs').value + ' yrs'); out('cgMo', fmt(+$('#cgMo').value)); out('cgRet', $('#cgRet').value + '%'); out('cgYrs', $('#cgYrs').value);
+  const years = +$('#nwYears').value;
+  const p = projectNW({ret: +$('#nwRet').value / 100, invest: +$('#nwInv').value, after: +$('#nwAfter').value, years});
+  const cross = t => { const x = p.pts.find(q => q.v >= t); return x ? (x.d <= today ? 'already' : monthLabel(x.d)) : `after ${today.getFullYear() + years}`; };
+  $('#nwKV').innerHTML = [[`In ${years} years`, fmt(p.pts[p.pts.length - 1].v)], ['Passes $100k', cross(1e5)], ['Passes $500k', cross(5e5)], ['Passes $1M', cross(1e6)]].map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+  const step = Math.max(1, Math.round(p.pts.length / 60)), pts = p.pts.filter((_, i) => i % step === 0);
+  const o = baseOpts(); o.plugins.tooltip.callbacks = {label: i => ' ' + fmt(i.raw)};
+  o.plugins.flags = {items: [1e5, 5e5, 1e6].map(t => ({index: pts.findIndex(q => q.v >= t), label: fmtK(t), color: css('--sun')})).filter(x => x.index > 0)};
+  chart('nwChart', {type: 'line', data: {labels: pts.map(q => q.d.getFullYear()), datasets: [{data: pts.map(q => Math.round(q.v)), borderColor: css('--accent'), borderWidth: 2.5, pointRadius: 0, tension: .25, fill: true, backgroundColor: areaFill}]}, options: o});
+  const price = +$('#hPrice').value, dp = +$('#hDown').value / 100, rate = +$('#hRate').value / 100 / 12, tax = +$('#hTax').value / 100, ins = +$('#hIns').value, hoa = +$('#hHoa').value;
+  const loan = price * (1 - dp), pi = rate ? loan * rate / (1 - Math.pow(1 + rate, -360)) : loan / 360;
+  const pmi = dp < .2 ? loan * .005 / 12 : 0, txm = price * tax / 12, total = pi + txm + ins / 12 + hoa + pmi, cashNeeded = price * (dp + .03);
+  const housing = (B.lines.find(l => l.name === 'Housing') || {}).avg || 0;
+  $('#hPay').textContent = fmt(total) + ' a month';
+  $('#hKV').innerHTML = [['Principal and interest', fmt(pi)], ['Property tax', fmt(txm)], ['Insurance', fmt(ins / 12)], ['PMI', pmi ? fmt(pmi) : 'none at 20% down'],
+    ['Share of take-home pay', INC.monthly ? Math.round(total / INC.monthly * 100) + '%' : '—'], ['Versus housing today', housing ? (total >= housing ? '+' : '−') + fmt(Math.abs(total - housing)) : '—'], ['Cash to close (down + 3%)', fmt(cashNeeded)]].map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+  const cut = +$('#cutAmt').value, cy = +$('#cutYrs').value;
+  $('#cutV').textContent = fmt(fv(0, cut, PL.return / 12, cy * 12));
+  $('#cutSub').textContent = `${fmt(cut)} a month for ${cy} years is ${fmt(cut * 12 * cy)} set aside, growing at ${Math.round(PL.return * 100)}%.`;
+  const st = +$('#cgStart').value, mo = +$('#cgMo').value, cr = +$('#cgRet').value / 100 / 12, yrs = +$('#cgYrs').value;
+  const ys = Array.from({length: yrs + 1}, (_, y) => y), contrib = ys.map(y => st + mo * 12 * y), total2 = ys.map(y => fv(st, mo, cr, y * 12));
+  $('#cgKV').innerHTML = [['Ending balance', fmt(total2[yrs])], ['You put in', fmt(contrib[yrs])], ['Growth', fmt(total2[yrs] - contrib[yrs])]].map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+  const o2 = baseOpts(); o2.scales.x.stacked = o2.scales.y.stacked = true; o2.plugins.legend = legendOpts();
+  o2.plugins.tooltip.callbacks = {label: i => ` ${i.dataset.label}: ${fmt(i.raw)}`};
+  chart('cgChart', {type: 'bar', data: {labels: ys.map(y => 'Yr ' + y), datasets: [
+    {label: 'Contributions', data: contrib.map(Math.round), backgroundColor: css('--s1'), borderColor: css('--surface'), borderWidth: {top: 2}, borderRadius: 2},
+    {label: 'Growth', data: total2.map((t, i) => Math.round(t - contrib[i])), backgroundColor: css('--s3'), borderColor: css('--surface'), borderWidth: {top: 2}, borderRadius: 2}]}, options: o2});
+}
+
+// ---------- ACCOUNTS ----------
+function renderAccounts() {
+  const TL = {cash: 'Cash', savings: 'Savings', retirement: 'Retirement', investments: 'Brokerage', other: 'Other', student_loan: 'Student loans', auto_loan: 'Auto loans', mortgage: 'Mortgage', loan: 'Loans', credit_card: 'Credit cards'};
+  const TC = {cash: '--s1', savings: '--s3', retirement: '--s7', investments: '--s4', other: '--other', student_loan: '--s2', auto_loan: '--s4', mortgage: '--s7', loan: '--s8', credit_card: '--s5'};
+  const comp = (items, bar, leg) => { const by = {}; items.forEach(i => by[i.kind] = (by[i.kind] || 0) + (i.balance || 0)); const t = Object.values(by).reduce((a, b) => a + b, 0) || 1; const k = Object.keys(by).filter(x => by[x] > 0).sort((a, b) => by[b] - by[a]);
+    $(bar).innerHTML = k.map(x => `<span title="${TL[x] || x} ${fmt(by[x])}" style="width:${by[x] / t * 100}%;background:var(${TC[x] || '--other'})"></span>`).join('');
+    $(leg).innerHTML = k.map(x => `<span><i style="background:var(${TC[x] || '--other'})"></i>${TL[x] || x} ${fmt(by[x])}</span>`).join(''); };
+  const own = ACC.filter(a => !a.liability), owe = ACC.filter(a => a.liability);
+  comp(own, '#assetBar', '#assetLegend'); comp(owe, '#liabBar', '#liabLegend');
+  $('#assetTot').textContent = fmt(assets); $('#liabTot').textContent = fmt(liabs);
+  const tbl = items => items.length ? `<tr><th>Account</th><th class="num">Balance</th></tr>` + [...items].sort((a, b) => (b.balance ?? -1) - (a.balance ?? -1)).map(a =>
+    `<tr><td>${esc(a.name)} ${a.source === 'manual' ? '<span class="pill warn">manual</span>' : `<span class="muted">${esc(a.institution || '')}${a.mask ? ' …' + esc(a.mask) : ''}</span>`}${D.liabilities[a.id] && D.liabilities[a.id].apr != null ? `<div class="sub">${D.liabilities[a.id].apr}% APR</div>` : ''}</td><td class="num">${a.balance == null ? '—' : fmt(a.balance, 2)}</td></tr>`).join('') : `<tr><td class="sub">Nothing here yet.</td></tr>`;
+  $('#assetTable').innerHTML = tbl(own); $('#liabTable').innerHTML = tbl(owe.filter(l => l.balance));
+  const I = D.investments, COL = {'Target-date funds': '--s3', 'Funds': '--s1', 'Stocks': '--s7', 'Bonds': '--s6', 'Crypto': '--s4', 'Cash': '--other', 'Options & other': '--s8', 'Not broken down': '--line'};
+  const mix = Object.entries(I.mix).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]), tot = mix.reduce((s, [, v]) => s + v, 0);
+  $('#invTot').textContent = tot ? fmt(tot) : '';
+  $('#invBar').innerHTML = mix.map(([k, v]) => `<span title="${esc(k)} ${fmt(v)}" style="width:${v / tot * 100}%;background:var(${COL[k] || '--s8'})"></span>`).join('');
+  $('#invLegend').innerHTML = mix.map(([k, v]) => `<span><i style="background:var(${COL[k] || '--s8'})"></i>${esc(k)} ${fmt(v)} · ${Math.round(v / tot * 100)}%</span>`).join('');
+  const crypto = I.mix.Crypto || 0, single = I.mix.Stocks || 0;
+  $('#invNote').textContent = crypto && nw > 0 && crypto / nw > .1 ? `Crypto is ${Math.round(crypto / nw * 100)}% of your net worth. It can swing 50% in a year, so it's risky to count on for a goal that's only a few years out.`
+    : single && tot && single / tot > .25 ? `Single stocks are ${Math.round(single / tot * 100)}% of your investments. Broad funds spread the risk.` : '';
+  $('#invTable').innerHTML = I.holdings.length ? `<tr><th>Holding</th><th>Type</th><th>Account</th><th class="num">Value</th></tr>` + I.holdings.slice(0, 25).map(h =>
+    `<tr><td>${esc(h.name || h.ticker)}${h.ticker && !/^CUR:/.test(h.ticker) ? ` <span class="muted">${esc(h.ticker)}</span>` : ''}</td><td class="muted">${esc(h.class)}</td><td class="muted">${esc(h.account)}</td><td class="num">${fmt(h.value, 2)}</td></tr>`).join('')
+    : '<tr><td class="sub">Holdings appear when an investment account is connected.</td></tr>';
+  const H = D.history.slice(-365), o = baseOpts(); o.plugins.tooltip.callbacks = {label: i => ' ' + fmt(i.raw)};
+  chart('histChart', {type: 'line', data: {labels: H.map(h => ymd(h.date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})), datasets: [{data: H.map(h => Math.round(h.net_worth)), borderColor: css('--accent'), borderWidth: 2, pointRadius: H.length < 3 ? 4 : 0, tension: .25, fill: true, backgroundColor: areaFill}]}, options: o});
+  const L = {ok: '<span class="pill good">connected</span>', login_required: '<span class="pill bad">log in again</span>', expiring: '<span class="pill warn">expires soon</span>', revoked: '<span class="pill bad">disconnected</span>', new_accounts: '<span class="pill warn">new accounts</span>', error: '<span class="pill warn">sync problem</span>'};
+  $('#itemTable').innerHTML = D.items.length ? D.items.map(i => `<tr><td>${esc(i.institution)}${i.history === 'importing' ? '<div class="sub">importing history…</div>' : ''}</td><td>${L[i.status] || ''}</td><td class="num sub">${i.last_sync ? new Date(i.last_sync).toLocaleString('en-US', {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'}) : ''}</td></tr>`).join('') : '<tr><td class="sub">No banks connected.</td></tr>';
+}
+
+// ---------- routing ----------
+const RENDER = {overview: renderOverview, plan: renderPlan, insights: renderInsights, budget: renderBudget, spending: renderSpending, recurring: renderRecurring, calculators: renderCalcs, accounts: renderAccounts};
+const rendered = new Set();
+function route() {
+  const v = RENDER[location.hash.slice(1)] ? location.hash.slice(1) : 'overview';
+  document.querySelectorAll('[data-view]').forEach(s => s.classList.toggle('on', s.dataset.view === v));
+  document.querySelectorAll('#tablist a').forEach(a => a.getAttribute('href') === '#' + v ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+  RENDER[v](); rendered.add(v);
+}
+function renderAll() { rendered.forEach(v => { if (document.querySelector(`[data-view="${v}"]`).classList.contains('on')) RENDER[v](); }); }
+window.addEventListener('hashchange', route);
+const words = D.app.name.split(' ');
+$('#brand').innerHTML = words.length > 1 ? `${esc(words.slice(0, -1).join(' '))} <span>${esc(words.at(-1))}</span>` : `<span>${esc(D.app.name)}</span>`;
+document.title = D.app.name;
+$('#foot').innerHTML = `Updated ${esc(D.app.generated.replace('T', ' '))}. Estimates, not financial advice.` + (LIVE ? ' <a href="/connect" style="color:var(--accent)">Banks</a> · <a href="/settings" style="color:var(--accent)">Settings</a> · <a href="/logout" style="color:var(--accent)">Sign out</a>' : '');
+const sb = $('#syncBtn');
+if (!LIVE) sb.hidden = true;
+sb.onclick = async () => { sb.disabled = true; sb.textContent = 'Syncing…';
+  try { const r = await fetch('/api/sync', {method: 'POST'}); if (!r.ok) throw 0; location.reload(); }
+  catch (e) { sb.textContent = 'Sync failed'; setTimeout(() => { sb.textContent = 'Sync'; sb.disabled = false; }, 2500); } };
+renderBanners();
+route();
+</script>
+</body></html>
