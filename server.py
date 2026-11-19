@@ -41,6 +41,7 @@ DATA = Path(os.environ.get("FIN_DATA", "/data"))
 os.environ["FIN_DATA"] = str(DATA)
 DATA.mkdir(parents=True, exist_ok=True)
 
+import importer  # noqa: E402
 import plaid_sync  # noqa: E402  (reads FIN_DATA at import)
 
 APP = os.environ.get("APP_NAME", "Waypoint")
@@ -408,6 +409,92 @@ document.querySelectorAll('[data-remove]').forEach(b => b.onclick = async () => 
 });
 """
 
+IMPORT_JS = r"""
+const $ = s => document.querySelector(s), esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const money = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const KINDS = {cash: 'Checking', savings: 'Savings', credit_card: 'Credit card'};
+let ACC = [];
+async function api(path, body) {
+  const r = await fetch(path, body ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)} : {});
+  const j = await r.json().catch(() => ({error: 'Server error (' + r.status + ')'}));
+  if (!r.ok || j.error) throw new Error(j.error || 'Something went wrong');
+  return j;
+}
+async function refresh() {
+  const j = await api('/api/imports');
+  ACC = j.accounts;
+  $('#done').innerHTML = j.imports.length ? '<h2>Imported files</h2>' + j.imports.map(i => `<div class="bank"><div><b>${esc(i.account_name || (ACC.find(a => a.id === i.account_id) || {}).name || 'Account')}</b>
+    <div class="muted">${esc(i.filename)} · ${i.count} transactions · ${i.first || ''} to ${i.last || ''}</div></div>
+    <button class="small danger" data-del="${esc(i.id)}">Remove</button></div>`).join('') : '';
+}
+function acctOptions(file) {
+  const f = file.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const guess = ACC.find(a => a.institution && f.includes(a.institution.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5)));
+  return ACC.map(a => `<option value="${esc(a.id)}"${guess && guess.id === a.id ? ' selected' : ''}>${esc(a.name)} · ${esc(a.institution || '')}${a.mask ? ' …' + esc(a.mask) : ''}</option>`).join('')
+    + `<option value="new"${guess ? '' : ' selected'}>New account (not connected)…</option>`;
+}
+function colSelect(key, label, p) {
+  return `<label>${label}<select data-col="${key}"><option value="">—</option>${p.headers.map((h, i) => `<option value="${i}"${p.mapping[key] === i ? ' selected' : ''}>${esc(h || 'Column ' + (i + 1))}</option>`).join('')}</select></label>`;
+}
+function render(card, st) {
+  const p = st.preview;
+  const rows = (p.sample || []).map(r => `<tr><td>${r.date}</td><td>${esc(r.desc)}</td><td style="text-align:right;white-space:nowrap" class="${r.amount < 0 ? 'ok' : ''}">${r.amount < 0 ? 'received ' + money(-r.amount) : 'spent ' + money(r.amount)}</td></tr>`).join('');
+  const debit = 'debit' in p.mapping && !('amount' in p.mapping);
+  card.innerHTML = `<b>${esc(st.name)}</b>
+    ${p.error ? `<p class="err">${esc(p.error)}</p>` : `<p class="muted" style="margin:4px 0 8px">${p.count} transactions, ${p.first} to ${p.last}${p.skipped ? ` · ${p.skipped} lines skipped (headers, totals or blank)` : ''}</p>`}
+    ${rows ? `<div style="overflow-x:auto"><table style="width:100%;font-size:14px;border-collapse:collapse">${rows}</table></div>
+    <label class="row" style="color:var(--fg);margin:8px 0"><input type="checkbox" data-flip${p.flip !== st.autoFlip ? ' checked' : ''}> Purchases show as "received": flip the signs</label>` : ''}
+    <details${p.error ? ' open' : ''}><summary class="muted">Columns</summary><div class="grid" style="margin-top:8px">
+      ${colSelect('date', 'Date', p)}${colSelect('desc', 'Description', p)}${debit ? colSelect('debit', 'Money out', p) + colSelect('credit', 'Money in', p) : colSelect('amount', 'Amount', p)}${colSelect('category', 'Bank category (optional)', p)}
+    </div></details>
+    <div class="grid" style="margin-top:12px"><label>Which account is this?<select data-acct>${acctOptions(st.name)}</select></label>
+      <label data-newname>New account name<input data-name value="${esc(st.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').slice(0, 40))}"></label>
+      <label data-newkind>Type<select data-kind>${Object.entries(KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label></div>
+    <div class="row" style="margin-top:12px"><button class="small" data-save${p.error || !p.count ? ' disabled' : ''}>Import</button><button class="small ghost" data-skip>Skip</button><span data-msg class="muted"></span></div>`;
+  const sync = () => { const isNew = card.querySelector('[data-acct]').value === 'new';
+    card.querySelector('[data-newname]').style.display = card.querySelector('[data-newkind]').style.display = isNew ? '' : 'none'; };
+  card.querySelector('[data-acct]').onchange = sync; sync();
+  const reparse = async () => {
+    const mapping = {}; card.querySelectorAll('[data-col]').forEach(s => { if (s.value !== '') mapping[s.dataset.col] = +s.value; });
+    const fl = card.querySelector('[data-flip]');
+    const flip = fl ? (fl.checked ? !st.autoFlip : st.autoFlip) : null;
+    try { st.preview = await api('/api/import/parse', {text: st.text, mapping, flip}); st.mapping = mapping; render(card, st); }
+    catch (e) { card.querySelector('[data-msg]').textContent = e.message; }
+  };
+  card.querySelectorAll('[data-col],[data-flip]').forEach(el => el.onchange = reparse);
+  card.querySelector('[data-skip]').onclick = () => card.remove();
+  card.querySelector('[data-save]').onclick = async e => {
+    e.target.disabled = true; const msg = card.querySelector('[data-msg]'); msg.textContent = 'Importing…';
+    const a = card.querySelector('[data-acct]').value;
+    const account = a === 'new' ? {name: card.querySelector('[data-name]').value, kind: card.querySelector('[data-kind]').value} : {id: a};
+    try {
+      const r = await api('/api/import/save', {filename: st.name, text: st.text, mapping: st.preview.mapping, flip: st.preview.flip, account});
+      card.innerHTML = `<p class="ok" style="margin:0"><b>${esc(st.name)}</b>: imported ${r.used} transactions${r.used < r.count ? ` (${r.count - r.used} were already covered by your bank connection)` : ''}.</p>`;
+      refresh();
+    } catch (err) { msg.textContent = err.message; e.target.disabled = false; }
+  };
+}
+$('#files').onchange = async e => {
+  for (const file of e.target.files) {
+    const card = document.createElement('div'); card.className = 'card'; card.textContent = 'Reading ' + file.name + '…';
+    $('#queue').append(card);
+    try {
+      if (file.size > 8e6) throw new Error('That file is over 8 MB. Download a shorter date range.');
+      const text = await file.text();
+      const preview = await api('/api/import/parse', {text});
+      render(card, {name: file.name, text, preview, autoFlip: preview.flip});
+    } catch (err) { card.innerHTML = `<b>${esc(file.name)}</b><p class="err">${esc(err.message)}</p>`; }
+  }
+  e.target.value = '';
+};
+document.addEventListener('click', async e => {
+  const id = e.target.dataset && e.target.dataset.del; if (!id) return;
+  if (e.target.dataset.armed !== '1') { e.target.dataset.armed = '1'; e.target.textContent = 'Tap again to remove'; return; }
+  e.target.disabled = true; await api('/api/import/remove', {id}).catch(() => {}); refresh();
+});
+refresh().catch(err => $('#done').innerHTML = `<p class="err">${esc(err.message)}</p>`);
+"""
+
 
 # ---------------------------------------------------------------- http
 class H(BaseHTTPRequestHandler):
@@ -507,6 +594,18 @@ class H(BaseHTTPRequestHandler):
             return self.send(200, page("Settings", body, 640))
         if path == "/api/settings":
             return self.settings_payload()
+        if path == "/import":
+            body = ("<h1>Import past transactions</h1><p>Your bank connection brings in up to about 2 years, depending on the bank. "
+                    "For older history, or a bank you don't connect, download a CSV of your transactions from the bank's website "
+                    "(look for <b>Download activity</b>, <b>Export</b> or <b>Download transactions</b>) and add it here.</p>"
+                    "<label><b style='color:var(--fg)'>Choose CSV files</b><input id='files' type='file' accept='.csv,.tsv,.txt,text/csv' multiple></label>"
+                    "<p class='muted' style='margin-top:8px'>Anything your bank connection already covers is skipped, so overlapping dates are fine. "
+                    "Files stay on your server.</p><div id='queue'></div><div id='done'></div>"
+                    "<p style='margin-top:18px'><a href='/'>Back to dashboard</a> · <a href='/connect'>Banks</a> · <a href='/settings'>Settings</a></p>"
+                    "<script type='module'>" + IMPORT_JS + "</script>")
+            return self.send(200, page("Import", body, 640))
+        if path == "/api/imports":
+            return self.imports_payload()
         if path == "/status":
             f = DATA / "last_sync.txt"
             return self.send(200, f.read_text() if f.exists() else "never synced", "text/plain")
@@ -534,6 +633,7 @@ class H(BaseHTTPRequestHandler):
         added = "<p class='ok'>Bank added. Your transactions are importing; this can take a minute or two.</p>" if q.get("added") else ""
         nxt = ("<p style='margin-top:18px'><a class='btn' href='/settings'>Next: set your goals</a></p>" if its and not settings()
                else "<p style='margin-top:18px'><a href='/'>Back to dashboard</a> · <a href='/settings'>Settings</a></p>" if its else "")
+        nxt += "<p class='muted' style='margin-top:12px'>Want older history? <a href='/import'>Import transactions from a CSV</a>.</p>"
         body = f"""<h1>Add your bank accounts</h1><p>Connect checking, savings, credit cards, loans and investments. Add each bank once.</p>
 {warn}{sandbox}{added}
 <button id="add" type="button" disabled>Add a bank account instantly</button>
@@ -552,7 +652,7 @@ class H(BaseHTTPRequestHandler):
         s = settings()
         accts = build.build_accounts(s)
         from datetime import date as _d
-        spend, flows = build.classify(build.load("plaid/transactions.json", []), accts, s)
+        spend, flows = build.classify(build.all_transactions(accts), accts, s)
         today = _d.today()
         inc = build.income_info(flows, today, {})
         avg = build.averages(spend, today)
@@ -592,6 +692,8 @@ class H(BaseHTTPRequestHandler):
                 if "application/x-www-form-urlencoded" in (self.headers.get("Content-Type") or ""):
                     return self.send(302, "", headers={"Location": "/connect"})
                 return self.json({"result": res.splitlines()[0]})
+            if path.startswith("/api/import/"):
+                return self.import_api(path, json.loads(self.body(12_000_000) or b"{}"))
             req = json.loads(self.body() or b"{}")
             if path.startswith("/api/plaid/") and not plaid_sync.configured():
                 return self.json({"error": "Plaid keys aren't set on the server yet. See the README."}, 400)
@@ -619,6 +721,43 @@ class H(BaseHTTPRequestHandler):
         except (ValueError, KeyError) as e:
             return self.json({"error": f"bad request: {type(e).__name__}"}, 400)
         self.send(404, "not found", "text/plain")
+
+    def imports_payload(self):
+        import build
+        accts = [a for a in build.build_accounts(settings()) if a["kind"] in ("cash", "savings", "credit_card")]
+        return self.json({"imports": importer.summary(),
+                          "accounts": [{k: a.get(k) for k in ("id", "name", "institution", "mask", "kind")} for a in accts]})
+
+    def import_api(self, path: str, req: dict):
+        if path == "/api/import/remove":
+            with _lock:
+                importer.remove(str(req.get("id")))
+                run_build()
+            return self.json({"ok": True})
+        text = str(req.get("text") or "")
+        if not text.strip():
+            return self.json({"error": "That file is empty."}, 400)
+        mapping = req.get("mapping") or None
+        if mapping is not None:
+            mapping = {k: int(v) for k, v in mapping.items() if k in ("date", "desc", "amount", "debit", "credit", "category") and str(v).lstrip("-").isdigit()}
+        flip = req.get("flip")
+        p = importer.parse(text, mapping, None if flip is None else bool(flip))
+        if path == "/api/import/parse":
+            return self.json({k: p.get(k) for k in ("headers", "mapping", "flip", "skipped", "first", "last", "error")}
+                             | {"count": len(p["rows"]), "sample": p["rows"][:3] + p["rows"][-3:] if len(p["rows"]) > 6 else p["rows"]})
+        if path == "/api/import/save":
+            if p.get("error") or not p["rows"]:
+                return self.json({"error": p.get("error") or "No transactions found in that file."}, 400)
+            account = req.get("account") or {}
+            with _lock:
+                rec = importer.add(req.get("filename") or "import.csv", p["rows"], account)
+                plaid_txs = json.loads((DATA / "plaid" / "transactions.json").read_text()) if (DATA / "plaid" / "transactions.json").exists() else []
+                dates = [t["date"] for t in plaid_txs if t["account_id"] == rec["account_id"]]
+                cutoff = min(dates) if dates else None
+                used = sum(1 for r in p["rows"] if not cutoff or r["date"] < cutoff)
+                run_build()
+            return self.json({"ok": True, "count": rec["count"], "used": used, "cutoff": cutoff})
+        return self.send(404, "not found", "text/plain")
 
     def exchange(self, req: dict):
         meta = req.get("metadata") or {}

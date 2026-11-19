@@ -5,6 +5,7 @@ A private money dashboard you host yourself. Connect your banks once and it show
 - **Net worth**, today and projected, with your goals marked on the timeline
 - **A plan** for your goals (emergency fund, paying off debt, a down payment, anything else), one at a time or split
 - **Budget** suggested from your real spending, with "safe to spend today"
+- **Older history**: import CSV downloads from your bank's website to go back further than the bank connection does
 - **Spending** by month, category and merchant; tap any transaction to recategorize it or mark it one-time
 - **Subscriptions and bills**, upcoming due dates and paydays
 - **Alerts** for running over budget, money leaving savings, big charges, due dates and bank connections that need attention (optional phone push)
@@ -27,9 +28,11 @@ There are two ways to do it. Pick one.
 
 If you have [Claude Code](https://claude.com/claude-code), open a terminal in an empty folder, start `claude`, and paste this:
 
-> Set up Waypoint for me: https://github.com/matthewlieb/waypoint. Fork it to my GitHub, clone it, then follow the CLAUDE.md in the repo step by step to deploy it on Railway with my own Plaid keys. I'm not a developer, so explain each step, tell me exactly what to click when I need to do something in a browser, and never ask me to paste passwords or keys into the chat. I'll set those myself.
+> Set up Waypoint for me: https://github.com/matthewlieb/waypoint. Fork it to my GitHub, clone it, then follow the CLAUDE.md in the repo step by step to deploy it on Railway with my own Plaid keys. I'm not a developer, so explain each step, tell me exactly what to click when I need to do something in a browser, and never ask me to paste passwords or keys into the chat. I'll set those myself. Once it's running, use Claude in Chrome to download my past transactions from my bank websites and import them (step 9 in CLAUDE.md). I'll log in to each bank myself.
 
 Claude handles the commands. You'll still do a few things yourself: sign in to GitHub, Railway and Plaid; create your Plaid account; and type your password and Plaid keys into Railway. Claude is told never to see those.
+
+With the [Claude in Chrome](https://claude.com/chrome) extension, Claude can also pull your older history: you open and sign in to each bank's website, and Claude downloads each account's transactions and imports them.
 
 ### Option B: do it by hand
 
@@ -69,6 +72,12 @@ Open your Railway address and sign in. The app walks you through it:
 2. **Set your goals**: savings accounts, emergency fund, which debts to pay off, savings goals and budget. Everything is pre-filled from your data; change what you like.
 3. On your phone, open the address in Safari → **Share → Add to Home Screen**. In Chrome on Android, use **⋮ → Add to Home screen**.
 
+### 5. Optional: bring in older history
+The bank connection brings in up to about 2 years of past transactions, depending on the bank. To go back further, or to include a bank you don't connect:
+1. Sign in to your bank's website, open each account's activity, and look for **Download** or **Export**. Choose **CSV** and the longest date range offered. Do this for each checking, savings and credit card account.
+2. In the app, open **Import** (link at the bottom of the dashboard) and choose the files.
+3. For each file, check that purchases show as "spent" (there's a box to flip it if not), pick which account it belongs to, and click **Import**. Anything the bank connection already has is skipped, so overlapping dates are fine.
+
 Data refreshes automatically when your bank has new transactions, plus every morning at 7. The **Sync** button forces a refresh.
 
 ### Optional: phone alerts
@@ -97,4 +106,4 @@ To run the server locally against Plaid Sandbox, put Sandbox keys in `.env` (see
 
 ## How it works
 
-`server.py` (stdlib HTTP server) → `plaid_sync.py` (Link tokens, token exchange, `/transactions/sync`, holdings, liabilities, verified webhooks; bank tokens encrypted at rest) → `build.py` (categorizes with Plaid's personal finance categories, matches transfers between your own accounts, detects income, builds budget, goals and alerts) → `template.html` (the dashboard, Chart.js). Data lives in `/data` on your volume.
+`server.py` (stdlib HTTP server) → `plaid_sync.py` (Link tokens, token exchange, `/transactions/sync`, holdings, liabilities, verified webhooks; bank tokens encrypted at rest) → `importer.py` (CSV imports: detects columns and signs, guesses categories, skips rows Plaid already has) → `build.py` (categorizes with Plaid's personal finance categories, matches transfers between your own accounts, detects income, builds budget, goals and alerts) → `template.html` (the dashboard, Chart.js). Data lives in `/data` on your volume.

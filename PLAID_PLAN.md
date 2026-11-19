@@ -71,7 +71,8 @@ This integration is maintained with the Plaid MCP; this file is its durable stat
 - One deployment per person with their own Plaid keys (no shared multi-user server), so nobody else holds a friend's bank data. Developer's request, 2026-11-16.
 - Route paths: `/connect`, `/settings`, `/api/plaid/{link_token,exchange,event,remove,webhook}`, `/api/settings`, `/api/sync`, `/api/override`. These carry over from the developer's existing app.
 - Webhook verification uses PyJWT + cryptography, the app's only third-party dependencies (WEBHOOK-003 requires a vetted JWT library).
+- CSV import (`importer.py`, `/import`) adds history older than Plaid's (days_requested 730) and banks not linked through Plaid. It never calls Plaid; for a linked account it only keeps rows older than Plaid's earliest transaction for that account. Developer's request, 2026-11-18.
 
 ## Open questions
 
-- Publish as a public GitHub repo so friends can fork it, or share another way? (awaiting the developer)
+- Resolved 2026-11-18: published at https://github.com/matthewlieb/waypoint (public) for friends to fork.

@@ -406,7 +406,7 @@ footer{margin-top:40px;font-size:12.5px;color:var(--muted)}
     <div class="scroll" style="margin-top:12px"><table id="invTable"></table></div></div>
   <div class="grid g2" style="margin-top:20px">
     <div class="panel"><h3 style="margin-bottom:8px">Net worth history</h3><div class="chart sm"><canvas id="histChart" role="img" aria-label="Net worth over time"></canvas></div><p class="note">One point per day the app synced.</p></div>
-    <div class="panel"><h3 style="margin-bottom:8px">Connections</h3><div class="scroll"><table id="itemTable"></table></div><p class="note"><a href="/connect">Add, reconnect or disconnect banks</a></p></div>
+    <div class="panel"><h3 style="margin-bottom:8px">Connections</h3><div class="scroll"><table id="itemTable"></table></div><p class="note"><a href="/connect">Add, reconnect or disconnect banks</a> · <a href="/import">Import older history (CSV)</a></p></div>
   </div>
 </section>
 
@@ -901,7 +901,7 @@ window.addEventListener('hashchange', route);
 const words = D.app.name.split(' ');
 $('#brand').innerHTML = words.length > 1 ? `${esc(words.slice(0, -1).join(' '))} <span>${esc(words.at(-1))}</span>` : `<span>${esc(D.app.name)}</span>`;
 document.title = D.app.name;
-$('#foot').innerHTML = `Updated ${esc(D.app.generated.replace('T', ' '))}. Estimates, not financial advice.` + (LIVE ? ' <a href="/connect" style="color:var(--accent)">Banks</a> · <a href="/settings" style="color:var(--accent)">Settings</a> · <a href="/logout" style="color:var(--accent)">Sign out</a>' : '');
+$('#foot').innerHTML = `Updated ${esc(D.app.generated.replace('T', ' '))}. Estimates, not financial advice.` + (LIVE ? ' <a href="/connect" style="color:var(--accent)">Banks</a> · <a href="/import" style="color:var(--accent)">Import</a> · <a href="/settings" style="color:var(--accent)">Settings</a> · <a href="/logout" style="color:var(--accent)">Sign out</a>' : '');
 const sb = $('#syncBtn');
 if (!LIVE) sb.hidden = true;
 sb.onclick = async () => { sb.disabled = true; sb.textContent = 'Syncing…';

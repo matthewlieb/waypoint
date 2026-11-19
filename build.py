@@ -16,6 +16,8 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import importer
+
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get("FIN_DATA", ROOT / "data"))
 P = DATA / "plaid"
@@ -99,7 +101,16 @@ def build_accounts(settings: dict) -> list[dict]:
         out.append({"id": m["id"], "name": m["name"], "institution": "Manual", "mask": None, "kind": m.get("kind", "other"),
                     "liability": bool(m.get("liability")), "balance": m.get("balance"), "source": "manual",
                     "note": m.get("note"), "hidden": False})
+    for a in importer.accounts():  # accounts that only exist as CSV imports
+        a["hidden"] = a["id"] in hidden
+        out.append(a)
     return out
+
+
+def all_transactions(accounts: list[dict]) -> list[dict]:
+    """Plaid transactions plus imported history older than what Plaid returned."""
+    txs = load("plaid/transactions.json", [])
+    return txs + importer.transactions(txs, {a["id"]: a for a in accounts})
 
 
 def classify(txs: list[dict], accounts: list[dict], settings: dict) -> tuple[list[dict], list[dict]]:
@@ -473,7 +484,7 @@ def main() -> None:
     items = json.loads((P / "items.json").read_text()) if (P / "items.json").exists() else []
     today = date.today()
     accounts = build_accounts(settings)
-    txs = load("plaid/transactions.json", [])
+    txs = all_transactions(accounts)
     spend, flows = classify(txs, accounts, settings)
     visible = [a for a in accounts if not a["hidden"]]
     assets = sum(a["balance"] or 0 for a in visible if not a["liability"])
